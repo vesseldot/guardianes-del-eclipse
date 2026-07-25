@@ -42,11 +42,18 @@ SFX = {
     "enemy_attack": "enemy_attack.wav",
     "sword_attack": "sword_attack.mp3",
     "hammer_attack": "hammer_attack.wav",
+    "dagger_attack": "dagger_attack.wav",
+    "defeat": "defeat.flac",
+    "victoria": "victroy.flac",
+    "dash": "dash.wav",
+    "empty_jar": "empty_jar.wav",
+    "button": "button.wav",
 }
 
 SFX_ARMAS = {
     "Espada": "sword_attack",
     "Martillo": "hammer_attack",
+    "Dagas": "dagger_attack",
 }
 
 

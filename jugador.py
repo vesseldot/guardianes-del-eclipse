@@ -155,6 +155,7 @@ class Jugador(Entity):
         if not self.vivo or self.ocupado() or self.estamina < COSTO_RODAR:
             return
         self._gastar_estamina(COSTO_RODAR)
+        sonido.reproducir_sfx("dash")
         self._t_rodar = RODAR_DUR
         self.invulnerable = max(self.invulnerable, RODAR_IFRAMES)
         self._dir_rodar = self._direccion_input() or self._hacia_camara()
@@ -202,7 +203,10 @@ class Jugador(Entity):
 
     def curar_frasco(self):
         """Bebe un frasco: cura y deja al jugador vulnerable un instante."""
-        if not self.vivo or self.ocupado() or self.frascos <= 0:
+        if not self.vivo or self.ocupado():
+            return
+        if self.frascos <= 0:
+            sonido.reproducir_sfx("empty_jar")
             return
         self.frascos -= 1
         self._t_beber = BEBER_DUR

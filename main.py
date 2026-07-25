@@ -314,6 +314,7 @@ class Juego:
     def _terminar_combate(self, victoria):
         self.pool.limpiar()
         if victoria:
+            sonido.reproducir_sfx("victoria")
             self.fragmentos += JEFES[self.indice_jefe]["fragmentos"]
             if self.indice_jefe >= len(JEFES) - 1:
                 sonido.reproducir_sfx("a_bodoque")
@@ -327,6 +328,7 @@ class Juego:
                 self.mensaje.poner("Guardian liberado", texto, "Ir al puesto")
                 self._ir_a(TRANSICION)
         else:
+            sonido.reproducir_sfx("defeat")
             self.mensaje.poner(
                 "HAS CAIDO",
                 "La corrupcion sigue avanzando. Vuelve a intentarlo.",
@@ -354,6 +356,7 @@ class Juego:
         self.fragmentos -= objeto["costo"]
         self.comprados.add(objeto["id"])
         self.jugador.aplicar_objeto(objeto)
+        sonido.reproducir_sfx("button")
         self.tienda.refrescar(self.fragmentos, self.comprados)
 
     def _salir_tienda(self):
