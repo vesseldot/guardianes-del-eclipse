@@ -50,7 +50,11 @@ FIN = "fin"
 
 class Juego:
 
-    def __init__(self):
+    def __init__(self, pbr_pipeline=None):
+        # Pipeline PBR de simplepbr (o None si no se inicializo). Lo guardamos
+        # para ajustar sus parametros (MSAA, normal maps, luces) al cambiar de
+        # preset de calidad sin reiniciar el juego.
+        self.pbr_pipeline = pbr_pipeline
         self.estado = MENU
         self.jugador = None
         self.jefe = None
@@ -97,7 +101,9 @@ class Juego:
         )
         # Textura de roca en el suelo. simplepbr ignora texturas sueltas en
         # primitivas, asi que al suelo le damos un shader propio de Ursina.
-        tex_piso = cargar_textura(TEXTURA_PISO)
+        tex_piso = cargar_textura(TEXTURA_PISO,
+                                  anisotropico=Config.p("anisotropico"),
+                                  max_lado=Config.p("tex_suelo_max"))
         if tex_piso is not None:
             from ursina.shaders import unlit_shader
             # Shader unlit: muestra la roca de forma pareja sin depender de la
@@ -181,6 +187,27 @@ class Juego:
         camera.clip_plane_far = max(Config.p("distancia_vista"), ALCANCE_MINIMO)
         self.pool.redimensionar(Config.p("pool_proyectiles"))
         self.menu.set_calidad(Config.calidad)
+
+        # --- Escalado de GPU por preset (lo que de verdad pesa en gama baja) ---
+        # Luz de relleno: en 'bajo' se apaga (2 luces en vez de 3). Menos luces
+        # = menos trabajo por pixel del shader PBR.
+        self.relleno.enabled = Config.p("luz_relleno")
+
+        # Filtrado anisotropico del suelo en vivo (el suelo y el borde comparten
+        # la misma textura, asi que una llamada basta).
+        from entorno import set_anisotropico
+        set_anisotropico(self.suelo, Config.p("anisotropico"))
+
+        # Pipeline PBR: ajusta MSAA, normal/occlusion maps y tope de luces en
+        # caliente (simplepbr recompila el shader al asignar estos atributos).
+        # Es el mayor ahorro de GPU: MSAA 4 -> 0 y sin normal maps aligeran
+        # muchisimo el sombreado de los modelos en graficos integrados.
+        if self.pbr_pipeline is not None:
+            self.pbr_pipeline.msaa_samples = Config.p("pbr_msaa")
+            self.pbr_pipeline.use_normal_maps = Config.p("pbr_normal_maps")
+            self.pbr_pipeline.use_occlusion_maps = Config.p("pbr_normal_maps")
+            self.pbr_pipeline.use_emission_maps = Config.p("pbr_normal_maps")
+            self.pbr_pipeline.max_lights = Config.p("pbr_max_luces")
 
     def _calidad_cambio(self, nueva):
         print(f"[rendimiento] calidad ajustada automaticamente a '{nueva}'")
@@ -457,13 +484,26 @@ if __name__ == "__main__":
     # texturas) se dibujan planos y blancos. simplepbr aplica su iluminacion
     # correcta. Si no estuviera instalado, seguimos sin el (modelos planos)
     # en vez de tumbar el juego.
+    #
+    # Se inicializa con los parametros del preset inicial (MSAA, normal maps,
+    # tope de luces). El nivel PBR se ajusta luego en vivo desde
+    # _aplicar_calidad; lo que NO se puede cambiar en caliente es iniciarlo o
+    # no, por eso ese interruptor (pbr=False) es una decision de arranque.
+    pbr_pipeline = None
     try:
         import simplepbr
-        simplepbr.init()
+        if Config.p("pbr"):
+            pbr_pipeline = simplepbr.init(
+                msaa_samples=Config.p("pbr_msaa"),
+                use_normal_maps=Config.p("pbr_normal_maps"),
+                use_occlusion_maps=Config.p("pbr_normal_maps"),
+                use_emission_maps=Config.p("pbr_normal_maps"),
+                max_lights=Config.p("pbr_max_luces"),
+            )
     except Exception as e:
         print(f"[render] simplepbr no disponible ({e}); modelos sin PBR")
 
-    juego = Juego()
+    juego = Juego(pbr_pipeline=pbr_pipeline)
 
     def update():
         juego.actualizar(utime.dt)

@@ -33,6 +33,19 @@ MOSTRAR_FPS = False       # activar solo al depurar: el contador cuesta unos ms
 # ---------------------------------------------------------------- presets
 # Cada preset controla lo caro: sombras dinamicas, particulas, niebla,
 # distancia de dibujado y cuantos proyectiles pueden existir a la vez.
+# Claves de GPU (las que de verdad pesan en gama baja):
+#   pbr              -> inicializar el pipeline PBR de simplepbr (decision de
+#                       ARRANQUE; si es False los modelos salen unlit, mas
+#                       barato pero mas planos).
+#   pbr_msaa         -> muestras de MSAA del pipeline PBR (0 = sin, lo mas
+#                       barato; 4 = suave pero caro en iGPU). Se ajusta en vivo.
+#   pbr_normal_maps  -> normal/occlusion maps en los modelos. Se ajusta en vivo.
+#   pbr_max_luces    -> tope de luces que evalua el shader PBR por pixel.
+#   anisotropico     -> filtrado anisotropico del suelo (1 = ninguno; 16 = maximo
+#                       nitido en angulo rasante, pero cuesta ancho de banda).
+#   tex_suelo_max    -> lado maximo (px) al que se reescala la textura del suelo
+#                       al cargarla (0 = sin reescalar, 4K original). Reduce VRAM.
+#   luz_relleno      -> encender la 3a luz (relleno). En bajo se apaga: 2 luces.
 PRESETS = {
     "bajo": dict(
         sombras=False,
@@ -42,6 +55,13 @@ PRESETS = {
         pool_proyectiles=14,
         detalle_suelo=1,      # subdivisiones del plano del arena
         suavizado=False,
+        pbr=True,             # PBR minimo (ver pbr_msaa/normal_maps abajo)
+        pbr_msaa=0,
+        pbr_normal_maps=False,
+        pbr_max_luces=2,
+        anisotropico=1,
+        tex_suelo_max=1024,   # suelo a 1K en iGPU
+        luz_relleno=False,
     ),
     "medio": dict(
         sombras=False,
@@ -51,6 +71,13 @@ PRESETS = {
         pool_proyectiles=24,
         detalle_suelo=2,
         suavizado=False,
+        pbr=True,
+        pbr_msaa=0,
+        pbr_normal_maps=False,
+        pbr_max_luces=3,
+        anisotropico=4,
+        tex_suelo_max=2048,   # suelo a 2K
+        luz_relleno=True,
     ),
     "alto": dict(
         sombras=True,
@@ -60,6 +87,13 @@ PRESETS = {
         pool_proyectiles=40,
         detalle_suelo=4,
         suavizado=True,
+        pbr=True,
+        pbr_msaa=4,
+        pbr_normal_maps=True,
+        pbr_max_luces=4,
+        anisotropico=16,
+        tex_suelo_max=0,      # 4K original, sin reescalar
+        luz_relleno=True,
     ),
 }
 

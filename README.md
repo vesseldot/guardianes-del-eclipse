@@ -86,6 +86,12 @@ Consulta `.gitignore` para el detalle.
 - **Una única luz direccional**, con sombras solo en calidad alta.
 - **Tres presets de calidad** (`bajo`, `medio`, `alto`) que controlan sombras,
   partículas, distancia de dibujado y tamaño del pool.
+- **Escalado de GPU por preset** (clave para gráficos integrados): cada preset
+  ajusta el pipeline PBR (`MSAA`, normal maps, tope de luces), el filtrado
+  anisotrópico, la resolución de la textura del suelo (4K→2K→1K) y el número de
+  luces. El MSAA y los normal maps se cambian en caliente al variar la calidad;
+  la resolución de textura y el arranque del pipeline PBR son de inicio. Para
+  gama muy baja, arranca en `bajo` (ajusta `CALIDAD_INICIAL` en `config.py`).
 - **Calidad adaptativa**: si los FPS promedio caen por debajo de 28 durante
   2.5 segundos, el juego baja un nivel de calidad solo. Si el usuario elige
   la calidad manualmente desde el menú, se respeta su elección.
