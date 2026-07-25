@@ -12,6 +12,7 @@ y se detiene antes de golpear, dando al jugador la ventana para esquivar.
 from ursina import Entity, Vec3, color as ucolor
 from math import radians, sin, cos, atan2, degrees
 from recursos import crear_visual, animar
+import sonido
 
 PERSEGUIR = 0
 TELEGRAFIAR = 1
@@ -48,6 +49,7 @@ class Jefe(Entity):
         self.vivo = True
         self._disparos_pendientes = 0
         self._cadencia_rafaga = 0.0
+        self._tercio_vida_sonido = min(2, int(self.vida_pct * 3))
 
         self.pool = pool
         self.visual, self.actor = crear_visual(self, definicion["clave"])
@@ -63,6 +65,10 @@ class Jefe(Entity):
         if not self.vivo:
             return
         self.vida -= cantidad
+        tercio_vida = max(0, min(2, int(self.vida_pct * 3)))
+        if self.definicion["clave"] == "conejo" and tercio_vida < self._tercio_vida_sonido:
+            sonido.reproducir_sfx("muere_bodoque")
+        self._tercio_vida_sonido = tercio_vida
 
         # Cambio de fase: mas rapido y mas agresivo en cada tramo.
         fase_esperada = self.total_fases - int(self.vida_pct * self.total_fases)
@@ -167,3 +173,4 @@ class Jefe(Entity):
             col=COLOR_AVISO,
             velocidad=14.0,
         )
+        sonido.reproducir_sfx("enemy_attack")

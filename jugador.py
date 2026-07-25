@@ -16,6 +16,7 @@ from ursina import Entity, Vec3, held_keys, camera, lerp, clamp, mouse
 from recursos import crear_visual, animar
 from datos import GUARDIANES, ARMAS, HECHIZOS
 from config import Config
+import sonido
 
 LIMITE_ARENA = 24.0   # radio del arena; evita que el jugador se salga
 
@@ -169,6 +170,7 @@ class Jugador(Entity):
         self._impacto_activo = True
         if self.fijado and self._obj_valido():
             self._mirar_instant(self._objetivo)       # encara al jefe al golpear
+        sonido.reproducir_ataque_arma(self.arma["nombre"])
         animar(self.actor, "Heavy" if pesado else "Attack", en_bucle=False)
 
     def lanzar_hechizo(self, pool, objetivo, col):
@@ -194,6 +196,7 @@ class Jugador(Entity):
         p.lanzar(origen=self.world_position + Vec3(0, 1.2, 0),
                  direccion=direccion, dano=h["dano"] + self.dano,
                  de_jugador=True, col=col, velocidad=h["velocidad"])
+        sonido.reproducir_sfx("spell_attack")
         animar(self.actor, "Cast", en_bucle=False)
         return True
 
@@ -204,6 +207,7 @@ class Jugador(Entity):
         self.frascos -= 1
         self._t_beber = BEBER_DUR
         self.curar(self.vida_max * FRASCO_CURA)
+        sonido.reproducir_sfx("curarse")
         animar(self.actor, "Drink", en_bucle=False)
 
     def alternar_fijado(self, objetivo):

@@ -26,6 +26,7 @@ from datos import JEFES, GUARDIANES, TRANSICIONES, MODELOS
 from recursos import faltantes, crear_visual
 from proyectiles import PoolProyectiles
 from jugador import Jugador, LIMITE_ARENA, CAM_DIST_MAX
+import sonido
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
@@ -223,6 +224,7 @@ class Juego:
     # -------------------------------------------------------- estados
     def _ir_a(self, estado):
         self.estado = estado
+        sonido.musica_para_estado(estado, self.indice_jefe, len(JEFES))
         for p in self.pantallas:
             p.ocultar()
 
@@ -314,6 +316,7 @@ class Juego:
         if victoria:
             self.fragmentos += JEFES[self.indice_jefe]["fragmentos"]
             if self.indice_jefe >= len(JEFES) - 1:
+                sonido.reproducir_sfx("a_bodoque")
                 self.mensaje.poner(
                     "EQUILIBRIO RESTAURADO",
                     "El dispositivo se estabiliza. Nadie tuvo que romperse del todo.",
@@ -360,6 +363,7 @@ class Juego:
 
     # ---------------------------------------------------------- bucle
     def actualizar(self, dt):
+        sonido.actualizar(dt)
         self.monitor.actualizar(dt)
 
         # El escaparate gira en la seleccion y en la tienda.
