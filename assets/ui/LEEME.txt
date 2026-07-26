@@ -1,0 +1,13 @@
+# Imagenes de la interfaz.
+#
+# Especificaciones y prompts de generacion: ver ARTE_UI.md en la raiz.
+#
+# Nomenclatura esperada por pantalla:
+#   menu.jpg           fondo del menu principal
+#   logo.png           emblema del titulo (transparente)
+#   instrucciones.jpg  fondo de la pantalla de controles
+#   seleccion.png      fondo+marco, mitad derecha transparente
+#   tienda.png         fondo+marco, mitad izquierda transparente
+#   transicion.jpg     fondo entre combates
+#   final.jpg          fondo de la pantalla final
+#   hud_marco.png      marco ornamental de combate (centro transparente)
