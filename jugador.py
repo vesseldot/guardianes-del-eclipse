@@ -109,6 +109,10 @@ class Jugador(Entity):
         # (calcado de Guardian Naturaleza.py); aqui solo se crea y se le cuelga
         # el arma equipada.
         self.movimiento = MovimientoPersonaje(self.actor)
+        # Todas las armas de una vez: asi el primer cambio de arma en combate
+        # no provoca un tiron por cargar su .glb (ver precargar_armas).
+        self.movimiento.precargar_armas(
+            [a["modelo"] for a in ARMAS if a.get("modelo")])
         self._equipar_arma_actual()
 
         # Camara: angulos "objetivo" que mueve el raton y angulos "reales" que
@@ -182,12 +186,16 @@ class Jugador(Entity):
             return
         self._ataque_pesado = pesado
         self._t_ataque = self.arma["recuperacion"] * (1.7 if pesado else 1.0)
-        self._impacto_t = 0.22 if pesado else 0.14   # windup hasta el golpe
+        # El golpe conecta a mitad del gesto (justo cuando el arma baja), no a
+        # un tiempo fijo: con el martillo el dano entraba mucho antes de que el
+        # arma llegara abajo.
+        self._impacto_t = self._t_ataque * 0.45
         self._impacto_activo = True
         if self.fijado and self._obj_valido():
             self._mirar_instant(self._objetivo)       # encara al jefe al golpear
         sonido.reproducir_ataque_arma(self.arma["nombre"])
-        self.movimiento.atacar()
+        # El gesto dura lo mismo que el bloqueo del arma, asi se ve completo.
+        self.movimiento.atacar(self._t_ataque)
 
     def lanzar_hechizo(self, pool, objetivo, col):
         """Hechizo a distancia: gasta FP y entra en recarga."""

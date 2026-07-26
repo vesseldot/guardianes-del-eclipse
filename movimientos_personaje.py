@@ -54,9 +54,25 @@ RIGHT_ARM_REST = (-10, 10, 70)
 RIGHT_FOREARM_REST = (0, 0, 15)
 RIGHT_HAND_REST = (0, 0, 0)
 
+# Reparto del gesto de golpe: anticipo (levanta), impacto (baja) y recuperacion
+# (vuelve al reposo). Son PROPORCIONES: atacar(duracion) las reescala para que
+# el gesto dure exactamente lo que el arma bloquea al personaje, en vez de los
+# 0.52 s fijos de antes -- con el martillo (1.22 s de bloqueo) el brazo ya
+# habia vuelto al reposo mucho antes de poder soltar el arma, y el golpe se
+# veia cortado a media bajada.
 ATTACK_WINDUP = 0.15
 ATTACK_STRIKE = 0.12
 ATTACK_RECOVER = 0.25
+ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE + ATTACK_RECOVER
+
+# Amplitud del arco, en grados sobre el eje de giro del brazo. El impacto baja
+# hasta ARCO_IMPACTO desde el reposo: con los +60 que habia antes el arma se
+# quedaba a media altura y no llegaba a bajar del todo. Subir este valor baja
+# mas el arma; bajarlo la deja mas arriba.
+ARCO_ANTICIPO = -28.0     # cuanto se levanta antes de golpear
+ARCO_IMPACTO = 115.0      # cuanto baja en el golpe
+ARCO_ANTEBRAZO_ANT = -35.0
+ARCO_ANTEBRAZO_IMP = 45.0
 
 
 def _ruta_panda(ruta):
@@ -81,7 +97,10 @@ class MovimientoPersonaje:
         self.running = False
         self.attacking = False
         self.attack_timer = 0.0
+        self._escala_ataque = 1.0     # lo fija atacar(duracion)
         self.arma = None
+        # clave -> Entity ya cargada y colgada de la mano (ver precargar_armas).
+        self._cache_armas = {}
 
         if not self.disponible:
             return
@@ -115,10 +134,8 @@ class MovimientoPersonaje:
         self.j_right_hand.setHpr(*self.right_hand_hpr)
 
     # ------------------------------------------------------------- arma
-    def equipar_arma(self, clave_arma):
-        """Cuelga en la mano derecha el arma registrada en ARMAS_GLB (por
-        clave: 'espada'/'martillo'/'hacha'). Sin llamarlo, el golpe es a
-        mano limpia.
+    def _crear_arma(self, clave_arma):
+        """Carga el .glb del arma y lo cuelga (desactivado) de la mano.
 
         Se carga con el loader de Panda (application.base.loader), no con
         Entity(model='ruta'): ese segundo camino busca el nombre como un
@@ -126,31 +143,78 @@ class MovimientoPersonaje:
         en ursina/entity.py) y con una ruta absoluta fuera de esa carpeta
         simplemente no lo encuentra.
         """
-        datos_arma = ARMAS_GLB.get(clave_arma)
-        if not self.disponible or not datos_arma:
-            return
-        self.quitar_arma()
+        datos_arma = ARMAS_GLB[clave_arma]
         nodo = application.base.loader.loadModel(_ruta_panda(datos_arma["archivo"]))
         # Las armas tambien traen texturas de 8K (espada.glb son ~511 MB de
         # VRAM sin reducir). Igual que en recursos.crear_visual.
         reducir_texturas(nodo, Config.p("tex_modelo_max"))
-        self.arma = Entity(model=nodo, parent=self.hand)
-        self.arma.position = datos_arma["pos"]
-        self.arma.rotation = datos_arma["rot"]
-        self.arma.world_scale = datos_arma["escala"]
+        e = Entity(model=nodo, parent=self.hand, enabled=False)
+        e.position = datos_arma["pos"]
+        e.rotation = datos_arma["rot"]
+        e.world_scale = datos_arma["escala"]
+        self._cache_armas[clave_arma] = e
+        return e
+
+    def precargar_armas(self, claves=None):
+        """Carga de golpe todas las armas y las deja listas y ocultas.
+
+        Se llama al crear el personaje: sin esto, la PRIMERA vez que se cambia
+        a un arma habia un tiron perceptible en pleno combate, porque en ese
+        momento se leia su .glb (45-57 MB) y se reescalaban sus texturas de 8K.
+        Precargando, ese coste se paga una sola vez al entrar al combate y los
+        cambios de arma pasan a ser instantaneos.
+        """
+        if not self.disponible:
+            return
+        for clave in (claves if claves is not None else ARMAS_GLB):
+            if clave in ARMAS_GLB and clave not in self._cache_armas:
+                try:
+                    self._crear_arma(clave)
+                except Exception as e:
+                    print(f"[movimientos] no se pudo precargar el arma {clave}: {e}")
+
+    def equipar_arma(self, clave_arma):
+        """Muestra en la mano derecha el arma registrada en ARMAS_GLB (por
+        clave: 'espada'/'martillo'/'hacha'). Sin llamarlo, el golpe es a
+        mano limpia.
+
+        Las armas se reutilizan desde la cache: cambiar de arma solo apaga una
+        entidad y enciende otra, sin tocar el disco.
+        """
+        if not self.disponible or clave_arma not in ARMAS_GLB:
+            return
+        self.quitar_arma()
+        e = self._cache_armas.get(clave_arma)
+        if e is None:
+            try:
+                e = self._crear_arma(clave_arma)
+            except Exception as err:
+                print(f"[movimientos] no se pudo cargar el arma {clave_arma}: {err}")
+                return
+        e.enabled = True
+        self.arma = e
 
     def quitar_arma(self):
+        """Oculta el arma en mano. No la destruye: queda en cache para volver
+        a equiparla sin recargarla."""
         if self.arma is not None:
-            self.arma.disable()
+            self.arma.enabled = False
             self.arma = None
 
     # ---------------------------------------------------------- el golpe
-    def atacar(self):
-        """Dispara el gesto si el brazo esta libre. No hace nada si ya esta golpeando."""
+    def atacar(self, duracion=None):
+        """Dispara el gesto si el brazo esta libre. No hace nada si ya esta golpeando.
+
+        'duracion' (segundos) estira o comprime el gesto completo para que
+        coincida con el tiempo que el arma deja bloqueado al personaje: el
+        martillo golpea despacio y las dagas rapido, con el mismo arco.
+        """
         if not self.disponible or self.attacking:
             return
         self.attacking = True
         self.attack_timer = 0.0
+        self._escala_ataque = (duracion / ATTACK_TOTAL
+                               if duracion and duracion > 0 else 1.0)
 
     def _animar_ataque(self, dt):
         self.attack_timer += dt
@@ -158,20 +222,28 @@ class MovimientoPersonaje:
         base_h, base_p, base_r = RIGHT_ARM_REST
         base_fr = RIGHT_FOREARM_REST[2]
 
-        if t < ATTACK_WINDUP:
-            p = t / ATTACK_WINDUP
-            self.right_arm_hpr = [base_h, base_p, lerp(base_r, base_r - 20, p)]
-            self.right_forearm_hpr = [0, 0, lerp(base_fr, base_fr - 30, p)]
+        # Fases reescaladas a la duracion pedida en atacar().
+        k = self._escala_ataque
+        t_ant = ATTACK_WINDUP * k
+        t_imp = ATTACK_STRIKE * k
+        t_rec = ATTACK_RECOVER * k
 
-        elif t < ATTACK_WINDUP + ATTACK_STRIKE:
-            p = (t - ATTACK_WINDUP) / ATTACK_STRIKE
-            self.right_arm_hpr = [base_h, base_p, lerp(base_r - 20, base_r + 60, p)]
-            self.right_forearm_hpr = [0, 0, lerp(base_fr - 30, base_fr + 20, p)]
+        if t < t_ant:
+            p = t / t_ant
+            self.right_arm_hpr = [base_h, base_p, lerp(base_r, base_r + ARCO_ANTICIPO, p)]
+            self.right_forearm_hpr = [0, 0, lerp(base_fr, base_fr + ARCO_ANTEBRAZO_ANT, p)]
 
-        elif t < ATTACK_WINDUP + ATTACK_STRIKE + ATTACK_RECOVER:
-            p = (t - ATTACK_WINDUP - ATTACK_STRIKE) / ATTACK_RECOVER
-            self.right_arm_hpr = [base_h, base_p, lerp(base_r + 60, base_r, p)]
-            self.right_forearm_hpr = [0, 0, lerp(base_fr + 20, base_fr, p)]
+        elif t < t_ant + t_imp:
+            p = (t - t_ant) / t_imp
+            self.right_arm_hpr = [base_h, base_p,
+                                  lerp(base_r + ARCO_ANTICIPO, base_r + ARCO_IMPACTO, p)]
+            self.right_forearm_hpr = [0, 0,
+                                      lerp(base_fr + ARCO_ANTEBRAZO_ANT, base_fr + ARCO_ANTEBRAZO_IMP, p)]
+
+        elif t < t_ant + t_imp + t_rec:
+            p = (t - t_ant - t_imp) / t_rec
+            self.right_arm_hpr = [base_h, base_p, lerp(base_r + ARCO_IMPACTO, base_r, p)]
+            self.right_forearm_hpr = [0, 0, lerp(base_fr + ARCO_ANTEBRAZO_IMP, base_fr, p)]
 
         else:
             self.attacking = False

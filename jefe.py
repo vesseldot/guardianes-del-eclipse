@@ -29,6 +29,26 @@ COLOR_AVISO = ucolor.rgb32(235, 120, 110)
 # de espaldas al acercarse al jugador.
 FRENTE_MODELO = 180.0
 
+# --- Sincronizacion entre animacion y desplazamiento real -------------------
+# Los clips vienen con una cadencia fija (Walking dura 1.03 s y Running 0.63 s),
+# asi que si se reproducen a velocidad 1.0 mientras el jefe avanza despacio los
+# pies "patinan": se ve la zancada de una carrera avanzando como al caminar.
+#
+# VEL_REF_* es la velocidad de suelo a la que cada clip se ve natural sin
+# alterar su ritmo. A partir de ahi:
+#   * se elige el clip cuya referencia queda mas cerca de la velocidad actual
+#     (el corte esta en la media geometrica de las dos referencias), y
+#   * se ajusta el ritmo de reproduccion (play rate) proporcionalmente, para
+#     que la zancada acompanie al avance real.
+# Son valores a ojo (dependen de la longitud del paso de cada modelo): si
+# alguna carrera sigue patinando, subir VEL_REF_CORRER; si se ve acelerada,
+# bajarlo.
+VEL_REF_CAMINAR = 1.9
+VEL_REF_CORRER = 5.2
+# Tope del ajuste: fuera de esta banda el clip se ve a camara lenta o acelerado.
+PLAYRATE_MIN = 0.75
+PLAYRATE_MAX = 1.60
+
 
 class Jefe(Entity):
 
@@ -60,6 +80,7 @@ class Jefe(Entity):
         # empezar el combate (ver Juego._iniciar_combate).
         self._sub_patron_final = None
         self._ataques_final = 0
+        self._cadencia_combo = 0.22   # lo recalcula _preparar_ataque_final
 
         self.pool = pool
         self.visual, self.actor = crear_visual(self, definicion["clave"])
@@ -136,15 +157,58 @@ class Jefe(Entity):
             return "Weapon_Combo"
         return "Attack"
 
-    def _cambiar_anim(self, nombre, en_bucle=True):
+    def _cambiar_anim(self, nombre, en_bucle=True, ritmo=1.0):
         if nombre == self._anim_actual:
             return
         self._anim_actual = nombre
         if nombre is None:
             if self.actor is not None:
                 self.actor.stop()
+            return
+        if self.actor is not None:
+            # El ritmo se fija ANTES de arrancar el clip: si se cambia con la
+            # animacion ya en marcha, Panda la reinicia y se ve un salto.
+            try:
+                self.actor.setPlayRate(ritmo, nombre)
+            except Exception:
+                pass
+        animar(self.actor, nombre, en_bucle=en_bucle)
+
+    def _anim_desplazamiento(self):
+        """Clip de avance y su ritmo, acordes a la velocidad real del jefe.
+
+        Devuelve (nombre, ritmo). Ver VEL_REF_* arriba: se elige el clip cuya
+        velocidad de referencia queda mas cerca de la actual y se ajusta el
+        ritmo para que la zancada no patine.
+        """
+        v = max(0.01, self.velocidad)
+        # Solo corre cuando la carrera puede reproducirse a un ritmo dentro de
+        # la banda permitida. Por debajo de ese punto el clip de correr habria
+        # que frenarlo hasta el tope (camara lenta, se ve peor que un paso
+        # rapido), asi que se camina acelerando la zancada.
+        corte = VEL_REF_CORRER * PLAYRATE_MIN
+        if v >= corte:
+            nombre, referencia = "Running", VEL_REF_CORRER
         else:
-            animar(self.actor, nombre, en_bucle=en_bucle)
+            nombre, referencia = "Walking", VEL_REF_CAMINAR
+        ritmo = min(PLAYRATE_MAX, max(PLAYRATE_MIN, v / referencia))
+        return nombre, ritmo
+
+    def _duracion_anim(self, nombre, respaldo):
+        """Duracion real del clip, o 'respaldo' si el modelo no lo trae.
+
+        Se usa para que el estado ATACAR dure lo que dura la animacion: con el
+        valor fijo de 0.9 s que habia antes, el clip de ataque (2.80 s) y el
+        combo del conejo (3.70 s) se cortaban a un tercio, y el golpe se veia
+        interrumpido antes de que el arma llegara al suelo.
+        """
+        if self.actor is None:
+            return respaldo
+        try:
+            d = self.actor.getDuration(nombre)
+        except Exception:
+            return respaldo
+        return d if d and d > 0 else respaldo
 
     def _limitar_arena(self):
         """Mismo tope que jugador.py: sin esto, al perseguir el jefe se
@@ -166,10 +230,13 @@ class Jefe(Entity):
             objetivo_ang = degrees(atan2(direccion.x, direccion.z)) + FRENTE_MODELO
             delta = (objetivo_ang - self.rotation_y + 180) % 360 - 180
             self.rotation_y += delta * min(1.0, 6 * dt)
-            # A partir de la fase 2 (_subir_fase ya subio la velocidad un
-            # 15% por fase) el jefe corre en vez de caminar: se nota que
-            # viene mas agresivo, no solo en los numeros.
-            self._cambiar_anim("Running" if self.velocidad > self.velocidad_base * 1.05 else "Walking")
+            # El clip (caminar/correr) y su ritmo salen de la velocidad REAL,
+            # no de la fase: asi la zancada acompana al avance en vez de
+            # patinar. Al subir de fase la velocidad crece un 15%, asi que los
+            # jefes rapidos pasan a correr solos, y los lentos siguen
+            # caminando (pero mas rapido) porque es lo que se ve coherente.
+            nombre, ritmo = self._anim_desplazamiento()
+            self._cambiar_anim(nombre, ritmo=ritmo)
         else:
             self._cambiar_anim(None)
 
@@ -190,7 +257,9 @@ class Jefe(Entity):
         # Se queda quieto y avisa. Aqui es donde el jugador reacciona.
         if self.temporizador <= 0:
             self._preparar_ataque()
-            self._entrar(ATACAR, 0.9)
+            # El estado dura lo que dura el clip, para que el golpe se vea
+            # completo (antes: 0.9 s fijos y la animacion se cortaba).
+            self._entrar(ATACAR, self._duracion_anim(self._anim_ataque(), 0.9))
 
     def _preparar_ataque(self):
         if self.patron == "final":
@@ -208,6 +277,11 @@ class Jefe(Entity):
         self._ataques_final += 1
         self._sub_patron_final = "combo"
         self._disparos_pendientes = 3
+        # Los 3 golpes se reparten a lo largo del clip. Antes iban fijos a
+        # 0.22 s, asi que con el combo de 3.70 s los tres caian en el primer
+        # medio segundo y el resto de la animacion no golpeaba nada.
+        duracion = self._duracion_anim("Weapon_Combo", 0.9)
+        self._cadencia_combo = duracion / (self._disparos_pendientes + 1)
 
     def _atacar(self, dt, jugador, hacia, dist):
         if self.patron == "final":
@@ -229,14 +303,14 @@ class Jefe(Entity):
             self._entrar(RECUPERAR, self.t_recuperacion)
 
     def _atacar_final(self, dt, jugador, hacia, dist):
-        # 3 golpes espaciados; solo conectan si el jugador sigue cerca (no
-        # se embiste como "embestida": el combo es corto y en el sitio).
+        # 3 golpes repartidos a lo largo del combo; solo conectan si el jugador
+        # sigue cerca (no se embiste como "embestida": el combo es en el sitio).
         self._cadencia_rafaga -= dt
         if self._disparos_pendientes and self._cadencia_rafaga <= 0:
             if dist < 4.5:
                 jugador.recibir_dano(self.dano * 0.6)
             self._disparos_pendientes -= 1
-            self._cadencia_rafaga = 0.22
+            self._cadencia_rafaga = self._cadencia_combo
 
     def _lanzar_hechizo(self, hacia, dist):
         p = self.pool.pedir()
