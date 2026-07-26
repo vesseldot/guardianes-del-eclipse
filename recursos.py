@@ -11,8 +11,9 @@ conforme salen de Blender, sin tocar una sola linea de logica.
 
 from ursina import Entity, Vec3, color as ucolor
 from panda3d.core import Filename
-from config import MODELOS as DIR_MODELOS
+from config import MODELOS as DIR_MODELOS, Config
 from datos import MODELOS
+from entorno import reducir_texturas
 
 # Panda3D expone Actor para modelos con animacion. Si el entorno no lo
 # tiene disponible, seguimos funcionando en modo estatico.
@@ -90,6 +91,10 @@ def crear_visual(padre, clave, escala_extra=1.0):
             # (se inicializa en main.py); sin el, estos modelos saldrian
             # planos y blancos.
             actor = Actor(ruta_p)
+            # Reducir las texturas ANTES de que el modelo se dibuje por primera
+            # vez: los .glb traen mapas de 8K (~340 MB de VRAM cada uno) y en
+            # una GPU integrada el driver aborta. Ver entorno.reducir_texturas.
+            reducir_texturas(actor, Config.p("tex_modelo_max"))
             actor.reparent_to(padre)
             actor.setScale(escala)
             _asentar_en_suelo(actor, padre)
@@ -101,6 +106,7 @@ def crear_visual(padre, clave, escala_extra=1.0):
     if ruta:
         # Modelo sin animacion: mas barato que un Actor.
         visual = Entity(parent=padre, model=ruta_p, scale=escala)
+        reducir_texturas(visual, Config.p("tex_modelo_max"))
         _asentar_en_suelo(visual, padre)
         return visual, None
 

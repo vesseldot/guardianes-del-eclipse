@@ -40,6 +40,37 @@ def _reducir_textura(ptex, max_lado):
     ptex.load(pequena)
 
 
+def reducir_texturas(nodo, max_lado):
+    """Reescala todas las texturas de un nodo cargado (modelo .glb) a lo sumo
+    'max_lado' px por lado. Devuelve cuantas redujo.
+
+    Por que hace falta: los .glb exportados por Meshy traen texturas de
+    8192x8192, que son ~340 MB de VRAM CADA UNA. Un personaje con dos mapas
+    son 681 MB, y en combate hay jugador + arma + jefe a la vez: mas de 1.5 GB.
+    En una GPU integrada (512 MB) el driver aborta con "requested more GPU
+    memory than is available". A 1024 px la misma textura ocupa ~5.5 MB.
+
+    No se puede resolver con la configuracion de Panda ('max-texture-dimension'
+    o 'texture-scale'): el cargador de glTF construye las texturas directamente
+    desde los buffers embebidos y no pasa por el camino que respeta esas
+    variables (comprobado). Hay que reescalarlas despues de cargar, y hacerlo
+    ANTES del primer dibujado: la VRAM se reserva al renderizar, asi que la
+    version de 8K nunca llega a la tarjeta.
+    """
+    if max_lado <= 0 or nodo is None:
+        return 0
+    n = 0
+    try:
+        for ptex in nodo.findAllTextures():
+            antes = max(ptex.getXSize(), ptex.getYSize())
+            _reducir_textura(ptex, max_lado)
+            if max(ptex.getXSize(), ptex.getYSize()) < antes:
+                n += 1
+    except Exception as e:
+        print(f"[entorno] no se pudieron reducir texturas: {e}")
+    return n
+
+
 def cargar_textura(ruta, repetir=True, anisotropico=16, max_lado=0):
     """Devuelve un Texture de Ursina desde una ruta del sistema, o None.
 

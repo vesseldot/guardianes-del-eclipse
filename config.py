@@ -45,6 +45,13 @@ MOSTRAR_FPS = False       # activar solo al depurar: el contador cuesta unos ms
 #                       nitido en angulo rasante, pero cuesta ancho de banda).
 #   tex_suelo_max    -> lado maximo (px) al que se reescala la textura del suelo
 #                       al cargarla (0 = sin reescalar, 4K original). Reduce VRAM.
+#   tex_modelo_max   -> lado maximo (px) de las texturas de los .glb. Es la
+#                       palanca de VRAM mas importante del juego: los modelos
+#                       traen mapas de 8192x8192 (~340 MB cada uno) y en combate
+#                       hay jugador + arma + jefe a la vez. Ver
+#                       entorno.reducir_texturas. Nunca se deja en 0: 8K no se
+#                       justifica en ninguna GPU para personajes de este tamano
+#                       en pantalla.
 #   luz_relleno      -> encender la 3a luz (relleno). En bajo se apaga: 2 luces.
 PRESETS = {
     "bajo": dict(
@@ -61,6 +68,7 @@ PRESETS = {
         pbr_max_luces=2,
         anisotropico=1,
         tex_suelo_max=1024,   # suelo a 1K en iGPU
+        tex_modelo_max=512,   # personajes/armas a 512 px en iGPU
         luz_relleno=False,
     ),
     "medio": dict(
@@ -77,6 +85,7 @@ PRESETS = {
         pbr_max_luces=3,
         anisotropico=4,
         tex_suelo_max=2048,   # suelo a 2K
+        tex_modelo_max=1024,  # personajes/armas a 1K
         luz_relleno=True,
     ),
     "alto": dict(
@@ -93,6 +102,7 @@ PRESETS = {
         pbr_max_luces=4,
         anisotropico=16,
         tex_suelo_max=0,      # 4K original, sin reescalar
+        tex_modelo_max=2048,  # personajes/armas a 2K (nunca 8K)
         luz_relleno=True,
     ),
 }

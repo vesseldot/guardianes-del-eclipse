@@ -28,7 +28,8 @@ Uso (ver jugador.py):
 
 from ursina import Entity, lerp, application
 from panda3d.core import Filename
-from config import MODELOS as DIR_MODELOS
+from config import MODELOS as DIR_MODELOS, Config
+from entorno import reducir_texturas
 
 # Armas sueltas (no forman parte del rig de ningun personaje: se cuelgan
 # aparte de RightHand con equipar_arma). Cada una trae su propio pivote de
@@ -130,6 +131,9 @@ class MovimientoPersonaje:
             return
         self.quitar_arma()
         nodo = application.base.loader.loadModel(_ruta_panda(datos_arma["archivo"]))
+        # Las armas tambien traen texturas de 8K (espada.glb son ~511 MB de
+        # VRAM sin reducir). Igual que en recursos.crear_visual.
+        reducir_texturas(nodo, Config.p("tex_modelo_max"))
         self.arma = Entity(model=nodo, parent=self.hand)
         self.arma.position = datos_arma["pos"]
         self.arma.rotation = datos_arma["rot"]
