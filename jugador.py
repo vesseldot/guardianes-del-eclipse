@@ -16,6 +16,8 @@ from ursina import Entity, Vec3, held_keys, camera, lerp, clamp, mouse
 from recursos import crear_visual, animar
 from datos import GUARDIANES, ARMAS, HECHIZOS
 from config import Config
+from movimientos_personaje import MovimientoPersonaje, ARMAS_GLB
+import sonido
 
 LIMITE_ARENA = 24.0   # radio del arena; evita que el jugador se salga
 
@@ -88,6 +90,7 @@ class Jugador(Entity):
         self.hechizo_idx = 0
         self.fijado = False                 # lock-on al jefe
         self._objetivo = None
+        self._otros_objetivos = ()          # enemigos extra golpeables (ver actualizar)
 
         # temporizadores de accion (0 = libre)
         self._t_rodar = 0.0
@@ -101,8 +104,12 @@ class Jugador(Entity):
         self._dir_rodar = Vec3(0, 0, 1)
 
         self.visual, self.actor = crear_visual(self, clave_guardian)
-        animar(self.actor, "Idle")
-        self._anim_actual = "Idle"
+
+        # El caminar/correr/golpear del modelo lo decide movimientos_personaje.py
+        # (calcado de Guardian Naturaleza.py); aqui solo se crea y se le cuelga
+        # el arma equipada.
+        self.movimiento = MovimientoPersonaje(self.actor)
+        self._equipar_arma_actual()
 
         # Camara: angulos "objetivo" que mueve el raton y angulos "reales" que
         # los persiguen con amortiguacion (da la sensacion pesada y estable).
@@ -134,6 +141,15 @@ class Jugador(Entity):
         self._t_rodar = self._t_ataque = self._t_beber = 0.0
         self._cd_hechizo = self._espera_est = 0.0
         self._impacto_activo = False
+        self.movimiento.attacking = False
+
+    def _equipar_arma_actual(self):
+        """Cuelga en la mano el .glb del arma equipada, si existe (ver ARMAS['modelo'])."""
+        modelo = self.arma.get("modelo")
+        if modelo and modelo in ARMAS_GLB:
+            self.movimiento.equipar_arma(modelo)
+        else:
+            self.movimiento.quitar_arma()
 
     # --------------------------------------------------------------- vida
     def recibir_dano(self, cantidad):
@@ -154,6 +170,7 @@ class Jugador(Entity):
         if not self.vivo or self.ocupado() or self.estamina < COSTO_RODAR:
             return
         self._gastar_estamina(COSTO_RODAR)
+        sonido.reproducir_sfx("dash")
         self._t_rodar = RODAR_DUR
         self.invulnerable = max(self.invulnerable, RODAR_IFRAMES)
         self._dir_rodar = self._direccion_input() or self._hacia_camara()
@@ -169,7 +186,8 @@ class Jugador(Entity):
         self._impacto_activo = True
         if self.fijado and self._obj_valido():
             self._mirar_instant(self._objetivo)       # encara al jefe al golpear
-        animar(self.actor, "Heavy" if pesado else "Attack", en_bucle=False)
+        sonido.reproducir_ataque_arma(self.arma["nombre"])
+        self.movimiento.atacar()
 
     def lanzar_hechizo(self, pool, objetivo, col):
         """Hechizo a distancia: gasta FP y entra en recarga."""
@@ -194,16 +212,21 @@ class Jugador(Entity):
         p.lanzar(origen=self.world_position + Vec3(0, 1.2, 0),
                  direccion=direccion, dano=h["dano"] + self.dano,
                  de_jugador=True, col=col, velocidad=h["velocidad"])
+        sonido.reproducir_sfx("spell_attack")
         animar(self.actor, "Cast", en_bucle=False)
         return True
 
     def curar_frasco(self):
         """Bebe un frasco: cura y deja al jugador vulnerable un instante."""
-        if not self.vivo or self.ocupado() or self.frascos <= 0:
+        if not self.vivo or self.ocupado():
+            return
+        if self.frascos <= 0:
+            sonido.reproducir_sfx("empty_jar")
             return
         self.frascos -= 1
         self._t_beber = BEBER_DUR
         self.curar(self.vida_max * FRASCO_CURA)
+        sonido.reproducir_sfx("curarse")
         animar(self.actor, "Drink", en_bucle=False)
 
     def alternar_fijado(self, objetivo):
@@ -212,6 +235,7 @@ class Jugador(Entity):
     def elegir_arma(self, indice):
         if 0 <= indice < len(ARMAS):
             self.arma_idx = indice
+            self._equipar_arma_actual()
 
     def cambiar_hechizo(self, delta=1):
         self.hechizo_idx = (self.hechizo_idx + delta) % len(HECHIZOS)
@@ -222,12 +246,18 @@ class Jugador(Entity):
                               CAM_DIST_MIN, CAM_DIST_MAX)
 
     # --------------------------------------------------------- bucle vida
-    def actualizar(self, dt, objetivo=None):
-        """Se llama desde el bucle principal (un solo punto de actualizacion)."""
+    def actualizar(self, dt, objetivo=None, otros_objetivos=None):
+        """Se llama desde el bucle principal (un solo punto de actualizacion).
+
+        'otros_objetivos' son enemigos golpeables ademas del jefe fijado
+        (por ahora, los fantasmas que invoca el conejo): cualquiera con
+        '.vivo', '.x'/'.z' y 'recibir_dano()' sirve.
+        """
         if not self.vivo:
             return
 
         self._objetivo = objetivo
+        self._otros_objetivos = otros_objetivos or ()
 
         # -- temporizadores --
         self.invulnerable = max(0.0, self.invulnerable - dt)
@@ -251,6 +281,7 @@ class Jugador(Entity):
             self.rotation_y = self._angulo(self._dir_rodar) + FRENTE_MODELO
             self._regenerar(dt, corriendo=False)
             self._orbitar_camara(dt)
+            self.movimiento.actualizar(dt, moviendo=True, corriendo=True)
             return
 
         # -- bebiendo o en recuperacion de ataque: rooteado --
@@ -259,8 +290,9 @@ class Jugador(Entity):
 
         dx = held_keys["d"] - held_keys["a"]
         dz = held_keys["w"] - held_keys["s"]
+        moviendo = not bloqueado and bool(dx or dz)
 
-        if not bloqueado and (dx or dz):
+        if moviendo:
             direccion = self._direccion_input()
             vel = self.velocidad
             if self._quiere_sprint() and self.estamina > 0:
@@ -276,12 +308,11 @@ class Jugador(Entity):
             else:
                 ang = self._angulo(direccion) + FRENTE_MODELO
                 self.rotation_y = self._lerp_ang(self.rotation_y, ang, 12 * dt)
-            self._cambiar_anim("Sprint" if corriendo else "Run")
         else:
             if self.fijado and self._obj_valido():
                 self._mirar_a(objetivo, dt)
-            self._cambiar_anim("Idle")
 
+        self.movimiento.actualizar(dt, moviendo=moviendo, corriendo=corriendo)
         self._regenerar(dt, corriendo)
         self._orbitar_camara(dt)
 
@@ -332,17 +363,29 @@ class Jugador(Entity):
         return Vec3(sin(a), 0, cos(a))
 
     def _resolver_melee(self, objetivo):
-        if objetivo is None or not objetivo.vivo:
-            return
-        dx = objetivo.x - self.x
-        dz = objetivo.z - self.z
-        dist = (dx * dx + dz * dz) ** 0.5
-        radio = 1.6 * objetivo.definicion.get("escala", 1.0)
-        if dist <= self.arma["alcance"] + radio:
-            dano = (self.arma["dano"] + self.dano)
-            if self._ataque_pesado:
-                dano *= self.arma["pesado"]
-            objetivo.recibir_dano(dano)
+        dano = self.arma["dano"] + self.dano
+        if self._ataque_pesado:
+            dano *= self.arma["pesado"]
+
+        if objetivo is not None and objetivo.vivo:
+            dx = objetivo.x - self.x
+            dz = objetivo.z - self.z
+            dist = (dx * dx + dz * dz) ** 0.5
+            radio = 1.6 * objetivo.definicion.get("escala", 1.0)
+            if dist <= self.arma["alcance"] + radio:
+                objetivo.recibir_dano(dano)
+
+        # Enemigos extra (p.ej. los fantasmas que invoca el conejo): mismo
+        # alcance del arma, radio de golpe generico porque no traen
+        # 'definicion' con escala como los jefes.
+        for otro in self._otros_objetivos:
+            if otro is None or not otro.vivo:
+                continue
+            dx = otro.x - self.x
+            dz = otro.z - self.z
+            dist = (dx * dx + dz * dz) ** 0.5
+            if dist <= self.arma["alcance"] + 1.0:
+                otro.recibir_dano(dano)
 
     def _mirar_a(self, objetivo, dt):
         ang = self._angulo(Vec3(objetivo.x - self.x, 0, objetivo.z - self.z)) + FRENTE_MODELO
@@ -361,11 +404,6 @@ class Jugador(Entity):
         """Interpolacion angular por el camino corto (evita giros de 360)."""
         d = (b - a + 180) % 360 - 180
         return a + d * t
-
-    def _cambiar_anim(self, nombre):
-        if nombre != self._anim_actual:
-            if animar(self.actor, nombre):
-                self._anim_actual = nombre
 
     # ------------------------------------------------------------ camara
     def _orbitar_camara(self, dt):

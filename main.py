@@ -18,6 +18,8 @@ Decisiones de rendimiento tomadas aqui:
 
 from ursina import (Ursina, Entity, Vec3, camera, color as ucolor, window,
                     application, time as utime, scene, destroy, mouse)
+from math import sin, cos, radians
+import random
 
 from config import (Config, MonitorRendimiento, TITULO, VSYNC, MOSTRAR_FPS,
                    TEXTURA_PISO, PISO_TILES, TEXTURA_CIELO)
@@ -26,6 +28,10 @@ from datos import JEFES, GUARDIANES, TRANSICIONES, MODELOS
 from recursos import faltantes, crear_visual
 from proyectiles import PoolProyectiles
 from jugador import Jugador, LIMITE_ARENA, CAM_DIST_MAX
+from fantasma import Fantasma
+import sonido
+
+FANTASMA_RADIO_APARICION = 3.5
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
@@ -58,6 +64,7 @@ class Juego:
         self.estado = MENU
         self.jugador = None
         self.jefe = None
+        self.fantasmas = []          # minions vivos, invocados por el conejo
         self.indice_jefe = 0
         self.fragmentos = 0
         self.comprados = set()
@@ -223,6 +230,7 @@ class Juego:
     # -------------------------------------------------------- estados
     def _ir_a(self, estado):
         self.estado = estado
+        sonido.musica_para_estado(estado, self.indice_jefe, len(JEFES))
         for p in self.pantallas:
             p.ocultar()
 
@@ -300,6 +308,7 @@ class Juego:
         definicion = JEFES[self.indice_jefe]
         if self.jefe:
             destroy(self.jefe)
+        self._limpiar_fantasmas()
         self.jefe = Jefe(definicion, self.pool, position=(0, 0, 10))
         self.pool.limpiar()
         self.jugador.position = Vec3(0, 0, -10)
@@ -311,9 +320,12 @@ class Juego:
 
     def _terminar_combate(self, victoria):
         self.pool.limpiar()
+        self._limpiar_fantasmas()
         if victoria:
+            sonido.reproducir_sfx("victoria")
             self.fragmentos += JEFES[self.indice_jefe]["fragmentos"]
             if self.indice_jefe >= len(JEFES) - 1:
+                sonido.reproducir_sfx("a_bodoque")
                 self.mensaje.poner(
                     "EQUILIBRIO RESTAURADO",
                     "El dispositivo se estabiliza. Nadie tuvo que romperse del todo.",
@@ -324,6 +336,7 @@ class Juego:
                 self.mensaje.poner("Guardian liberado", texto, "Ir al puesto")
                 self._ir_a(TRANSICION)
         else:
+            sonido.reproducir_sfx("defeat")
             self.mensaje.poner(
                 "HAS CAIDO",
                 "La corrupcion sigue avanzando. Vuelve a intentarlo.",
@@ -351,6 +364,7 @@ class Juego:
         self.fragmentos -= objeto["costo"]
         self.comprados.add(objeto["id"])
         self.jugador.aplicar_objeto(objeto)
+        sonido.reproducir_sfx("button")
         self.tienda.refrescar(self.fragmentos, self.comprados)
 
     def _salir_tienda(self):
@@ -358,8 +372,28 @@ class Juego:
         self.jugador.curar(int(self.jugador.vida_max * 0.5))
         self._iniciar_combate()
 
+    # -------------------------------------------------------- fantasmas
+    def _invocar_fantasmas(self, origen, cantidad):
+        """Hace aparecer 'cantidad' fantasmas alrededor de 'origen',
+        repartidos en circulo para no salir todos amontonados en el mismo
+        punto. Se usa una sola vez, al empezar la pelea con el conejo (ver
+        _iniciar_combate); no es un ataque que se repita durante el combate."""
+        base_ang = random.uniform(0, 360)
+        for i in range(cantidad):
+            ang = radians(base_ang + i * (360 / cantidad))
+            offset = Vec3(sin(ang), 0, cos(ang)) * FANTASMA_RADIO_APARICION
+            f = Fantasma(position=origen + offset)
+            self.fantasmas.append(f)
+        sonido.reproducir_sfx("enemy_attack")
+
+    def _limpiar_fantasmas(self):
+        for f in self.fantasmas:
+            destroy(f)
+        self.fantasmas.clear()
+
     # ---------------------------------------------------------- bucle
     def actualizar(self, dt):
+        sonido.actualizar(dt)
         self.monitor.actualizar(dt)
 
         # El escaparate gira en la seleccion y en la tienda.
@@ -369,8 +403,17 @@ class Juego:
         if self.estado != COMBATE:
             return
 
-        self.jugador.actualizar(dt, self.jefe)
+        self.jugador.actualizar(dt, self.jefe, otros_objetivos=self.fantasmas)
         self.jefe.actualizar(dt, self.jugador)
+
+        vivos = []
+        for f in self.fantasmas:
+            if f.vivo:
+                f.actualizar(dt, self.jugador)
+                vivos.append(f)
+            else:
+                destroy(f)
+        self.fantasmas = vivos
 
         self._mover_proyectiles(dt)
         self.hud.actualizar(self.jugador, self.jefe, self.fragmentos)

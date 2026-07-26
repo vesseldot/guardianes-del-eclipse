@@ -31,6 +31,12 @@ rock_wall_16_4k.blend/textures/rock_wall_16_rough_4k.exr
 # HDRI del cielo: en runtime solo se usa el JPG tonemapeado (que SI se sube).
 NightSkyHDRI016B_1K/*.exr
 
+# Copias del proyecto descargadas de GitHub (el ZIP de una rama se descomprime
+# como "guardianes-del-eclipse-<rama>"). Traen sus propios modelos y sus rutas NO
+# las cubren los patrones de arriba, que estan anclados a la raiz del repo: sin
+# esta linea, un "git add -A" subiria varios GB de .glb duplicados.
+guardianes-del-eclipse-*/
+
 # --- Sistema / editores ---
 .DS_Store
 Thumbs.db

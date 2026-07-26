@@ -28,7 +28,7 @@ MODELOS = {
     "naturaleza_jefe": dict(carpeta="naturaleza_jefe", archivo="naturaleza_jefe.glb", escala=2.4, respaldo="cube", color=color.rgb32(100, 135, 75)),
     "vacio_jefe":      dict(carpeta="vacio_jefe",      archivo="vacio_jefe.glb",      escala=2.6, respaldo="cube", color=color.rgb32(95, 80, 150)),
 
-    "conejo":   dict(carpeta="conejo",   archivo="conejo.glb",   escala=2.0, respaldo="cube",   color=color.rgb32(190, 60, 60)),
+    "conejo":   dict(carpeta="conejo",   archivo="conejo.glb",   escala=2.4, respaldo="cube",   color=color.rgb32(190, 60, 60)),
     "mercader": dict(carpeta="mercader", archivo="mercader.glb", escala=1.2, respaldo="cube",   color=color.rgb32(150, 165, 110)),
     "fantasma": dict(carpeta="fantasma", archivo="fantasma.glb", escala=0.8, respaldo="sphere", color=color.rgb32(235, 235, 235)),
 }
@@ -125,10 +125,11 @@ OBJETOS = [
 # 'alcance'      = distancia a la que llega el golpe
 # 'recuperacion' = segundos de bloqueo tras atacar (mayor = mas lento)
 # 'pesado'       = multiplicador de dano del ataque pesado (clic derecho)
+# 'modelo'       = clave en movimientos_personaje.ARMAS_GLB
 ARMAS = [
-    dict(nombre="Espada",   dano=20, alcance=3.2, recuperacion=0.42, pesado=1.8),
-    dict(nombre="Martillo", dano=32, alcance=3.4, recuperacion=0.72, pesado=2.1),
-    dict(nombre="Dagas",    dano=13, alcance=2.4, recuperacion=0.26, pesado=1.6),
+    dict(nombre="Espada",   dano=20, alcance=3.2, recuperacion=0.42, pesado=1.8, modelo="espada"),
+    dict(nombre="Martillo", dano=32, alcance=3.4, recuperacion=0.72, pesado=2.1, modelo="martillo"),
+    dict(nombre="Hacha",    dano=26, alcance=3.0, recuperacion=0.58, pesado=1.9, modelo="hacha"),
 ]
 
 

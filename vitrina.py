@@ -42,6 +42,8 @@ class Vitrina:
         self.clave = clave
         self.raiz.rotation_y = 0
         self.raiz.enabled = True
+        # Quieto a proposito: solo el escaparate gira (ver rotar()), el
+        # modelo no camina ni en la seleccion de guardian ni en la tienda.
 
     def _limpiar(self):
         # Un Actor es un nodo de Panda (no una Entity de Ursina); conviene
