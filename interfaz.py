@@ -231,6 +231,46 @@ class PantallaTitulo(Pantalla):
         self.aviso.color = ucolor.rgba32(240, 238, 232, int(90 + 165 * p))
 
 
+# ------------------------------------------------------------ PAUSA
+class PantallaPausa(Pantalla):
+    """Menu de pausa sobre el combate detenido.
+
+    No lleva imagen de fondo a proposito: solo un velo oscuro semitransparente,
+    para que se siga viendo la escena congelada por detras y quede claro que la
+    partida sigue ahi y no se ha perdido.
+    """
+
+    def __init__(self, al_continuar, al_calidad, al_abandonar):
+        super().__init__()
+
+        # z=1 lo manda detras del resto de esta pantalla, pero sigue estando
+        # por delante de la escena 3D (camera.ui se dibuja encima de todo).
+        self.velo = Entity(parent=self.raiz, model="quad",
+                           color=ucolor.rgba32(8, 8, 10, 185),
+                           scale=(camera.aspect_ratio, 1), z=1)
+
+        Text(parent=self.raiz, text="PAUSA", origin=(0, 0),
+             position=(0, .26), scale=2.2, color=CLARO)
+
+        self.btn_continuar = Button(parent=self.raiz, text="Continuar",
+                                    scale=(.3, .07), position=(0, .06), color=PANEL)
+        self.btn_continuar.on_click = al_continuar
+
+        self.btn_calidad = Button(parent=self.raiz, text="Calidad: medio",
+                                  scale=(.3, .07), position=(0, -.04), color=PANEL)
+        self.btn_calidad.on_click = al_calidad
+
+        self.btn_abandonar = Button(parent=self.raiz, text="Abandonar",
+                                    scale=(.3, .07), position=(0, -.14), color=PANEL)
+        self.btn_abandonar.on_click = al_abandonar
+
+        Text(parent=self.raiz, text="esc para volver al combate", origin=(0, 0),
+             position=(0, -.28), scale=.7, color=TENUE)
+
+    def set_calidad(self, valor):
+        self.btn_calidad.text = f"Calidad: {valor}"
+
+
 # ------------------------------------------------------------ MENU
 class MenuPrincipal(Pantalla):
 

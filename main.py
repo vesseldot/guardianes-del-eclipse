@@ -41,7 +41,8 @@ FANTASMA_RADIO_APARICION = 3.5
 ALCANCE_MINIMO = (2 * LIMITE_ARENA + CAM_DIST_MAX + 15) / 0.9
 from jefe import Jefe
 from interfaz import (HUD, MenuPrincipal, SeleccionGuardian, Tienda,
-                     PantallaMensaje, Instrucciones, PantallaTitulo)
+                     PantallaMensaje, Instrucciones, PantallaTitulo,
+                     PantallaPausa)
 from vitrina import Vitrina
 
 # --------------------------------------------------------------- estados
@@ -50,6 +51,7 @@ MENU = "menu"
 SELECCION = "seleccion"
 INSTRUCCIONES = "instrucciones"
 COMBATE = "combate"
+PAUSA = "pausa"       # combate congelado, se puede reanudar
 TIENDA = "tienda"
 TRANSICION = "transicion"
 FIN = "fin"
@@ -178,10 +180,13 @@ class Juego:
         self.menu = MenuPrincipal(self._pulsar_jugar, application.quit, self._ciclar_calidad)
         self.seleccion = SeleccionGuardian(self._elegir_guardian, self._previsualizar_guardian)
         self.instrucciones = Instrucciones(self._comenzar_combate)
+        self.pausa = PantallaPausa(self._reanudar, self._ciclar_calidad,
+                                   self._abandonar_combate)
         self.tienda = Tienda(self._comprar, self._salir_tienda)
         self.mensaje = PantallaMensaje(self._continuar_mensaje)
         self.pantallas = (self.hud, self.titulo, self.menu, self.seleccion,
-                          self.instrucciones, self.tienda, self.mensaje)
+                          self.instrucciones, self.tienda, self.mensaje,
+                          self.pausa)
 
         # Escaparate 3D para la seleccion de guardian y la tienda.
         self.vitrina = Vitrina(position=(0, 0, 0))
@@ -196,6 +201,7 @@ class Juego:
         camera.clip_plane_far = max(Config.p("distancia_vista"), ALCANCE_MINIMO)
         self.pool.redimensionar(Config.p("pool_proyectiles"))
         self.menu.set_calidad(Config.calidad)
+        self.pausa.set_calidad(Config.calidad)
 
         # --- Escalado de GPU por preset (lo que de verdad pesa en gama baja) ---
         # Luz de relleno: en 'bajo' se apaga (2 luces en vez de 3). Menos luces
@@ -232,15 +238,21 @@ class Juego:
     # -------------------------------------------------------- estados
     def _ir_a(self, estado):
         self.estado = estado
-        sonido.musica_para_estado(estado, self.indice_jefe, len(JEFES))
+        # En pausa NO se toca la musica: la pista de combate debe seguir donde
+        # estaba. Ademas 'pausa' no es un estado que conozca sonido.py, asi que
+        # la llamada saltaria a la musica de menu.
+        if estado != PAUSA:
+            sonido.musica_para_estado(estado, self.indice_jefe, len(JEFES))
         for p in self.pantallas:
             p.ocultar()
 
-        mostrar_mundo = estado in (COMBATE,)
+        # La pausa conserva el mundo visible: el combate se ve congelado detras
+        # del velo. Lo que si se libera es el raton, para poder pulsar botones.
+        mostrar_mundo = estado in (COMBATE, PAUSA)
         # El raton se bloquea (oculto y centrado) solo en combate, que es
         # cuando controla la camara. En menus y tienda debe estar libre para
         # poder pulsar los botones.
-        mouse.locked = mostrar_mundo
+        mouse.locked = (estado == COMBATE)
         for e in self.escenario:
             e.enabled = mostrar_mundo
         if self.jugador:
@@ -265,6 +277,8 @@ class Juego:
             self.instrucciones.mostrar()
         elif estado == COMBATE:
             self.hud.mostrar()
+        elif estado == PAUSA:
+            self.pausa.mostrar()
         elif estado == TIENDA:
             self.vitrina.mostrar("mercader")
             self._enfocar_vitrina(hacia_derecha=-2.0, distancia=6.8)
@@ -307,6 +321,25 @@ class Juego:
 
     def _comenzar_combate(self):
         self._iniciar_combate()
+
+    # ---------------------------------------------------------- pausa
+    def _pausar(self):
+        """Congela el combate. No se destruye nada: actualizar() deja de
+        avanzar la partida porque el estado ya no es COMBATE, y _ir_a mantiene
+        el mundo visible para que se vea detras del velo."""
+        if self.estado == COMBATE:
+            self._ir_a(PAUSA)
+
+    def _reanudar(self):
+        if self.estado == PAUSA:
+            self._ir_a(COMBATE)
+
+    def _abandonar_combate(self):
+        """Salir al menu desde la pausa. Se limpia lo que quedo en vuelo para
+        no arrastrarlo al siguiente combate."""
+        self.pool.limpiar()
+        self._limpiar_fantasmas()
+        self._ir_a(MENU)
 
     def _iniciar_combate(self):
         definicion = JEFES[self.indice_jefe]
@@ -491,9 +524,14 @@ class Juego:
                 self._ir_a(SELECCION)
             return
 
+        if self.estado == PAUSA:
+            if key == "escape":
+                self._reanudar()
+            return
+
         if self.estado == COMBATE:
             if key == "escape":
-                self._ir_a(MENU)
+                self._pausar()          # antes salia al menu y se perdia la partida
             elif key == "scroll up" and self.jugador:
                 self.jugador.zoom_camara(-1)     # acercar
             elif key == "scroll down" and self.jugador:
