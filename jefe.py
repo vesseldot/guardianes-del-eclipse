@@ -20,6 +20,10 @@ PERSEGUIR = 0
 TELEGRAFIAR = 1
 ATACAR = 2
 RECUPERAR = 3
+INVOCANDO = 4     # conjuro inicial del jefe final; ver invocar()
+
+# Clip con el que el conejo hace aparecer a los fantasmas.
+ANIM_INVOCACION = "Charged_Spell_Cast"
 
 COLOR_AVISO = ucolor.rgb32(235, 120, 110)
 
@@ -137,6 +141,10 @@ class Jefe(Entity):
         elif self.estado == RECUPERAR:
             if self.temporizador <= 0:
                 self._entrar(PERSEGUIR, 0.4)
+        elif self.estado == INVOCANDO:
+            # Quieto hasta que acaba el conjuro; despues entra al ciclo normal.
+            if self.temporizador <= 0:
+                self._entrar(PERSEGUIR, 0.4)
 
     def _entrar(self, estado, duracion):
         self.estado = estado
@@ -147,8 +155,20 @@ class Jefe(Entity):
             # Solo los patrones con el clip propio lo muestran; si el
             # modelo no lo trae, animar() no hace nada (ver recursos.py).
             self._cambiar_anim(self._anim_ataque(), en_bucle=False)
+        elif estado == INVOCANDO:
+            self._cambiar_anim(ANIM_INVOCACION, en_bucle=False)
         elif estado != PERSEGUIR:
             self._cambiar_anim(None)
+
+    def invocar(self):
+        """Arranca el conjuro con el que aparecen los fantasmas.
+
+        Necesita un estado propio: si solo se lanzara el clip, _perseguir lo
+        pisaria con Walking en el siguiente frame. Mientras dura, el jefe se
+        queda quieto y no ataca, que es justo la ventana en la que el jugador
+        ve venir la oleada.
+        """
+        self._entrar(INVOCANDO, self._duracion_anim(ANIM_INVOCACION, 1.2))
 
     def _anim_ataque(self):
         """Nombre del clip de ataque. El conejo usa su propio combo cuerpo

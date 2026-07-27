@@ -33,6 +33,10 @@ import sonido
 
 FANTASMA_RADIO_APARICION = 3.5
 FANTASMAS_OLEADA = 4          # cuantos acompanan al jefe final
+# En que punto del conjuro aparecen (0 = al empezar el gesto, 1 = al acabarlo).
+# A 0.6 salen cuando el jefe ya ha levantado los brazos, que es cuando el gesto
+# "suelta": si aparecieran en el frame 0 pareceria que no tienen que ver con el.
+FANTASMAS_MOMENTO = 0.6
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
@@ -69,6 +73,7 @@ class Juego:
         self.jugador = None
         self.jefe = None
         self.fantasmas = []          # minions vivos, invocados por el conejo
+        self._t_invocacion = 0.0     # cuenta atras hasta que salen (>0 = pendiente)
         self.indice_jefe = 0
         self.fragmentos = 0
         self.comprados = set()
@@ -355,10 +360,11 @@ class Juego:
         self.jugador.reponer_recursos()
         self.jugador.fijado = True
 
-        # Oleada de fantasmas en el combate final: salen una sola vez, junto al
-        # conejo, y hay que despejarlos mientras se pelea con el.
+        # Oleada de fantasmas en el combate final: el jefe hace su conjuro y
+        # los fantasmas aparecen a media animacion. Salen una sola vez.
         if definicion["patron"] == "final":
-            self._invocar_fantasmas(self.jefe.position, FANTASMAS_OLEADA)
+            self.jefe.invocar()
+            self._t_invocacion = self.jefe.temporizador * FANTASMAS_MOMENTO
 
         self._ir_a(COMBATE)
 
@@ -432,6 +438,9 @@ class Juego:
         sonido.reproducir_sfx("enemy_attack")
 
     def _limpiar_fantasmas(self):
+        # Cancela tambien una oleada pendiente: si no, al abandonar el combate
+        # los fantasmas apareceriamos en la siguiente partida.
+        self._t_invocacion = 0.0
         for f in self.fantasmas:
             destroy(f)
         self.fantasmas.clear()
@@ -451,6 +460,12 @@ class Juego:
 
         if self.estado != COMBATE:
             return
+
+        # Oleada pendiente: aparece a media animacion del conjuro del jefe.
+        if self._t_invocacion > 0:
+            self._t_invocacion -= dt
+            if self._t_invocacion <= 0:
+                self._invocar_fantasmas(self.jefe.position, FANTASMAS_OLEADA)
 
         self.jugador.actualizar(dt, self.jefe, otros_objetivos=self.fantasmas)
         self.jefe.actualizar(dt, self.jugador)
