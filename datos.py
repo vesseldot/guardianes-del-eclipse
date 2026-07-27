@@ -30,13 +30,13 @@ MODELOS = {
 
     "conejo":   dict(carpeta="conejo",   archivo="conejo.glb",   escala=2.4, respaldo="cube",   color=color.rgb32(190, 60, 60)),
     "mercader": dict(carpeta="mercader", archivo="mercader.glb", escala=1.2, respaldo="cube",   color=color.rgb32(150, 165, 110)),
-    # Escala enorme a proposito: el modelo viene exportado diminuto (0.013 de
-    # alto). Con 100 mide ~1.3 u, mas bajo que un guardian (1.7 u), que es lo
-    # que toca para un enemigo de enjambre.
-    # (Este .glb ademas excede el limite de mezclas de huesos de panda3d-gltf y
-    # se carga por la via de recursos._cargar_actor_simplificado, pero eso no
-    # afecta a su tamano.)
-    "fantasma": dict(carpeta="fantasma", archivo="fantasma.glb", escala=100.0, respaldo="sphere", color=color.rgb32(235, 235, 235)),
+    # Ojo con esta escala: el modelo mide 1.3 u por si solo, mas bajo que un
+    # guardian (1.7 u), que es lo que toca para un enemigo de enjambre. Estuvo
+    # en 100 mientras el .glb se cargaba sin esqueleto, porque esa via se salta
+    # la correccion de transformacion del nodo padre y dejaba la malla a 0.013.
+    # Al pasar a cargarlo con el esqueleto simplificado esa correccion vuelve a
+    # aplicarse, asi que el factor correcto es 1.0.
+    "fantasma": dict(carpeta="fantasma", archivo="fantasma.glb", escala=1.0, respaldo="sphere", color=color.rgb32(235, 235, 235)),
 }
 
 

@@ -32,14 +32,14 @@ from fantasma import Fantasma
 import sonido
 
 FANTASMA_RADIO_APARICION = 3.5
-FANTASMAS_OLEADA = 4          # cuantos acompanan al jefe final
+FANTASMAS_OLEADA = 2          # cuantos salen en cada oleada
 # En que punto del conjuro aparecen (0 = al empezar el gesto, 1 = al acabarlo).
 # A 0.6 salen cuando el jefe ya ha levantado los brazos, que es cuando el gesto
 # "suelta": si aparecieran en el frame 0 pareceria que no tienen que ver con el.
 FANTASMAS_MOMENTO = 0.6
 # Cuantas oleadas llega a invocar el jefe final en total. Al despejar una,
 # vuelve a conjurar la siguiente hasta agotarlas.
-FANTASMAS_OLEADAS = 3
+FANTASMAS_OLEADAS = 2
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
