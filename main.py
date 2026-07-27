@@ -32,6 +32,7 @@ from fantasma import Fantasma
 import sonido
 
 FANTASMA_RADIO_APARICION = 3.5
+FANTASMAS_OLEADA = 4          # cuantos acompanan al jefe final
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
@@ -353,6 +354,12 @@ class Juego:
         # Recursos al maximo y jefe fijado (lock-on) al empezar cada combate.
         self.jugador.reponer_recursos()
         self.jugador.fijado = True
+
+        # Oleada de fantasmas en el combate final: salen una sola vez, junto al
+        # conejo, y hay que despejarlos mientras se pelea con el.
+        if definicion["patron"] == "final":
+            self._invocar_fantasmas(self.jefe.position, FANTASMAS_OLEADA)
+
         self._ir_a(COMBATE)
 
     def _terminar_combate(self, victoria):

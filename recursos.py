@@ -55,6 +55,9 @@ def _asentar_en_suelo(nodo, padre):
 # Cache de rutas ya comprobadas: evita golpear el disco en cada spawn.
 _cache_rutas = {}
 
+# Rutas que ya fallaron al cargarse como Actor: no se reintentan.
+_sin_actor = set()
+
 
 def ruta_modelo(clave):
     """Devuelve la ruta del .glb si existe, o None."""
@@ -72,6 +75,38 @@ def ruta_modelo(clave):
     return ruta
 
 
+def _cargar_sin_esqueleto(ruta_p):
+    """Carga un .glb descartando su skinning. Devuelve el nodo, o None.
+
+    Por que hace falta: panda3d-gltf guarda el indice de mezcla de huesos de
+    cada vertice en una columna de 16 bits, asi que un modelo con mas de 65535
+    combinaciones distintas de huesos y pesos revienta al cargarlo
+    (AssertionError en combine_mesh_skin). Le pasa al fantasma.
+
+    Como esos modelos aqui no necesitan animacion esqueletica, se anula el paso
+    que falla y la malla se carga estatica. Ojo: ese paso tambien aplicaba la
+    transformacion del nodo padre, asi que el modelo sale con la escala en
+    bruto del archivo y hay que compensarla con 'escala' en datos.MODELOS.
+    """
+    try:
+        import gltf._converter as conv
+    except Exception:
+        return None
+    original = conv.Converter.combine_mesh_skin
+    conv.Converter.combine_mesh_skin = lambda self, geom_node, charinfo: None
+    try:
+        from ursina import application
+        # Con cache: el .glb del fantasma pesa 34 MB y en el combate final
+        # salen cuatro. La version con esqueleto nunca llega a cachearse
+        # porque falla, asi que no hay riesgo de mezclar las dos.
+        return application.base.loader.loadModel(ruta_p)
+    except Exception as e:
+        print(f"[recursos] tampoco cargo sin esqueleto: {e}")
+        return None
+    finally:
+        conv.Converter.combine_mesh_skin = original
+
+
 def crear_visual(padre, clave, escala_extra=1.0):
     """
     Adjunta la parte visible de un personaje a 'padre'.
@@ -84,7 +119,10 @@ def crear_visual(padre, clave, escala_extra=1.0):
     ruta = ruta_modelo(clave)
     ruta_p = _ruta_panda(ruta) if ruta else None
 
-    if ruta and ACTOR_DISPONIBLE:
+    # Los modelos que ya se sabe que no cargan como Actor no se reintentan: el
+    # fallo escupe un traceback y releer un .glb de decenas de MB para volver a
+    # fallar cuesta, y en el combate final salen cuatro fantasmas de golpe.
+    if ruta and ACTOR_DISPONIBLE and ruta_p not in _sin_actor:
         try:
             # Los .glb se cargan como Actor: es la forma que respeta sus
             # materiales/texturas PBR. El sombreado real lo aporta simplepbr
@@ -101,16 +139,30 @@ def crear_visual(padre, clave, escala_extra=1.0):
             return actor, actor
         except Exception as e:
             # Un modelo mal exportado no debe tumbar la partida.
-            print(f"[recursos] no se pudo cargar {ruta}: {e}")
+            _sin_actor.add(ruta_p)
+            print(f"[recursos] {clave}: no carga como Actor, se usara estatico ({e})")
 
     if ruta:
         # Modelo sin animacion: mas barato que un Actor.
-        visual = Entity(parent=padre, model=ruta_p, scale=escala)
+        try:
+            visual = Entity(parent=padre, model=ruta_p, scale=escala)
+        except Exception:
+            visual = None
+        if visual is None or visual.model is None:
+            # Ultimo intento antes de rendirse a la primitiva: sin skinning.
+            nodo = _cargar_sin_esqueleto(ruta_p)
+            if nodo is None:
+                return _respaldo(padre, spec, escala)
+            visual = Entity(parent=padre, model=nodo, scale=escala)
         reducir_texturas(visual, Config.p("tex_modelo_max"))
         _asentar_en_suelo(visual, padre)
         return visual, None
 
-    # Respaldo: primitiva del color del personaje.
+    return _respaldo(padre, spec, escala)
+
+
+def _respaldo(padre, spec, escala):
+    """Primitiva del color del personaje, para cuando no hay modelo cargable."""
     visual = Entity(
         parent=padre,
         model=spec.get("respaldo", "cube"),
@@ -119,6 +171,7 @@ def crear_visual(padre, clave, escala_extra=1.0):
         origin_y=-0.5,
     )
     return visual, None
+
 
 
 def animar(actor, nombre, en_bucle=True):

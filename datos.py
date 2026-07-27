@@ -30,7 +30,12 @@ MODELOS = {
 
     "conejo":   dict(carpeta="conejo",   archivo="conejo.glb",   escala=2.4, respaldo="cube",   color=color.rgb32(190, 60, 60)),
     "mercader": dict(carpeta="mercader", archivo="mercader.glb", escala=1.2, respaldo="cube",   color=color.rgb32(150, 165, 110)),
-    "fantasma": dict(carpeta="fantasma", archivo="fantasma.glb", escala=0.8, respaldo="sphere", color=color.rgb32(235, 235, 235)),
+    # Escala enorme a proposito: este .glb excede el limite de mezclas de
+    # huesos de panda3d-gltf, asi que se carga sin esqueleto (ver
+    # recursos._cargar_sin_esqueleto) y eso deja la malla en su escala bruta,
+    # que es diminuta (0.013 de alto). Con 100 mide ~1.3 u: mas bajo que un
+    # guardian (1.7 u), que es lo que toca para un enemigo de enjambre.
+    "fantasma": dict(carpeta="fantasma", archivo="fantasma.glb", escala=100.0, respaldo="sphere", color=color.rgb32(235, 235, 235)),
 }
 
 
