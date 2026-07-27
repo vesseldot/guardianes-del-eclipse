@@ -329,18 +329,19 @@ class Juego:
                 self.mensaje.poner(
                     "EQUILIBRIO RESTAURADO",
                     "El dispositivo se estabiliza. Nadie tuvo que romperse del todo.",
-                    "Volver al menu")
+                    "Volver al menu", fondo="final")
                 self._ir_a(FIN)
             else:
                 texto = TRANSICIONES[min(self.indice_jefe, len(TRANSICIONES) - 1)]
-                self.mensaje.poner("Guardian liberado", texto, "Ir al puesto")
+                self.mensaje.poner("Guardian liberado", texto, "Ir al puesto",
+                                   fondo="transicion")
                 self._ir_a(TRANSICION)
         else:
             sonido.reproducir_sfx("defeat")
             self.mensaje.poner(
                 "HAS CAIDO",
                 "La corrupcion sigue avanzando. Vuelve a intentarlo.",
-                "Reintentar")
+                "Reintentar", fondo="final")
             self._ir_a(FIN)
 
     def _continuar_mensaje(self):

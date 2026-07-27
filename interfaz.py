@@ -10,18 +10,59 @@ regenerar la geometria del texto y hacerlo cada frame se nota.
 from ursina import (Entity, Text, Button, Quad, camera, color as ucolor,
                     Vec2, Vec3, destroy)
 from datos import GUARDIANES, OBJETOS
+from config import RAIZ
+from entorno import cargar_textura
 
 CLARO = ucolor.rgb32(240, 238, 232)
 TENUE = ucolor.rgb32(150, 148, 142)
 PANEL = ucolor.rgba32(20, 20, 22, 190)
 RESALTE = ucolor.rgba32(150, 120, 40, 230)   # boton actualmente elegido
 
+DIR_UI = RAIZ / "assets" / "ui"
+
+# Cache de texturas de interfaz: varias pantallas pueden pedir la misma imagen
+# y cargarla dos veces seria pagar dos veces la memoria.
+_cache_ui = {}
+
+
+def cargar_ui(archivo, max_lado=1920):
+    """Textura de 'assets/ui', o None si la imagen todavia no existe.
+
+    Se pasa por entorno.cargar_textura porque la ruta del proyecto lleva
+    acentos y el cargador por nombre de Ursina falla con ella. Si falta el
+    archivo, la pantalla se dibuja sin fondo igual que antes: el juego nunca
+    depende de que el arte este terminado.
+    """
+    if archivo in _cache_ui:
+        return _cache_ui[archivo]
+    ruta = DIR_UI / archivo
+    tex = cargar_textura(ruta, repetir=False, max_lado=max_lado) if ruta.exists() else None
+    if tex is None:
+        print(f"[interfaz] sin imagen de fondo para {archivo}")
+    _cache_ui[archivo] = tex
+    return tex
+
 
 class Pantalla:
     """Base: agrupa elementos y los muestra u oculta en bloque."""
 
-    def __init__(self):
+    def __init__(self, fondo=None):
         self.raiz = Entity(parent=camera.ui, enabled=False)
+        self.fondo = self._poner_fondo(fondo) if fondo else None
+
+    def _poner_fondo(self, archivo):
+        """Imagen a pantalla completa detras del resto de la pantalla.
+
+        z=1 la manda al fondo: en camera.ui lo que tiene mas z se dibuja
+        detras, asi que textos y botones (z=0) quedan por delante. La escala
+        es (aspect_ratio, 1) porque el espacio de UI mide 1 de alto y
+        'aspect_ratio' de ancho: eso cubre la pantalla justa.
+        """
+        tex = cargar_ui(archivo)
+        if tex is None:
+            return None
+        return Entity(parent=self.raiz, model="quad", texture=tex,
+                      scale=(camera.aspect_ratio, 1), z=1)
 
     def mostrar(self):
         self.raiz.enabled = True
@@ -153,26 +194,38 @@ class HUD(Pantalla):
 class MenuPrincipal(Pantalla):
 
     def __init__(self, al_jugar, al_salir, al_calidad):
-        super().__init__()
-        Text(parent=self.raiz, text="GUARDIANES DEL ECLIPSE", origin=(0, 0),
-             position=(0, .26), scale=2.4, color=CLARO)
+        super().__init__(fondo="menu.png")
+
+        # El logo ya lleva el titulo dibujado, asi que sustituye al texto. Si
+        # la imagen no esta, se cae al texto de siempre y el menu sigue
+        # servible (mismo criterio que con los modelos que faltan).
+        #
+        # El emblema es 3:2 y ocupa la mitad superior: por eso los botones
+        # bajan respecto al layout de solo texto, para no quedar debajo de el.
+        tex_logo = cargar_ui("logo.png", max_lado=1024)
+        if tex_logo is not None:
+            self.logo = Entity(parent=self.raiz, model="quad", texture=tex_logo,
+                               scale=(.60, .40), position=(0, .26), z=.5)
+        else:
+            Text(parent=self.raiz, text="GUARDIANES DEL ECLIPSE", origin=(0, 0),
+                 position=(0, .30), scale=2.4, color=CLARO)
         Text(parent=self.raiz, text="un guardian queda en pie", origin=(0, 0),
-             position=(0, .18), scale=.9, color=TENUE)
+             position=(0, .00), scale=.9, color=TENUE)
 
         self.btn_jugar = Button(parent=self.raiz, text="Jugar", scale=(.3, .07),
-                                position=(0, .02), color=PANEL)
+                                position=(0, -.10), color=PANEL)
         self.btn_jugar.on_click = al_jugar
 
         self.btn_calidad = Button(parent=self.raiz, text="Calidad: medio", scale=(.3, .07),
-                                  position=(0, -.08), color=PANEL)
+                                  position=(0, -.20), color=PANEL)
         self.btn_calidad.on_click = al_calidad
 
         self.btn_salir = Button(parent=self.raiz, text="Salir", scale=(.3, .07),
-                                position=(0, -.18), color=PANEL)
+                                position=(0, -.30), color=PANEL)
         self.btn_salir.on_click = al_salir
 
         Text(parent=self.raiz, text="WASD moverse   ·   clic atacar   ·   espacio esquivar   ·   esc pausa",
-             origin=(0, 0), position=(0, -.34), scale=.7, color=TENUE)
+             origin=(0, 0), position=(0, -.43), scale=.7, color=TENUE)
 
     def set_calidad(self, valor):
         self.btn_calidad.text = f"Calidad: {valor}"
@@ -183,7 +236,7 @@ class Instrucciones(Pantalla):
     """Pantalla intermedia: explica premisa y controles antes del combate."""
 
     def __init__(self, al_comenzar):
-        super().__init__()
+        super().__init__(fondo="instrucciones.png")
 
         Text(parent=self.raiz, text="Como jugar", origin=(0, 0),
              position=(0, .42), scale=1.7, color=CLARO)
@@ -232,7 +285,9 @@ class Instrucciones(Pantalla):
 class SeleccionGuardian(Pantalla):
 
     def __init__(self, al_elegir, al_previsualizar=None):
-        super().__init__()
+        # La mitad derecha de la imagen es transparente: por ahi se ve el
+        # modelo 3D del escaparate (camera.ui se dibuja sobre la escena).
+        super().__init__(fondo="seleccion.png")
         Text(parent=self.raiz, text="Elige tu guardian", origin=(-.5, 0),
              position=(-.62, .40), scale=1.5, color=CLARO)
 
@@ -303,7 +358,8 @@ class SeleccionGuardian(Pantalla):
 class Tienda(Pantalla):
 
     def __init__(self, al_comprar, al_continuar):
-        super().__init__()
+        # Transparente por la izquierda: ahi aparece el mercader.
+        super().__init__(fondo="tienda.png")
         # El modelo del mercader se muestra a la izquierda, asi que toda la
         # UI de la tienda vive en la mitad derecha. CX es el centro de columna.
         CX = .34
@@ -348,6 +404,13 @@ class PantallaMensaje(Pantalla):
 
     def __init__(self, al_continuar):
         super().__init__()
+        # Esta pantalla se reutiliza para dos momentos muy distintos, asi que
+        # tiene dos fondos y enciende uno u otro en poner(). Se crean los dos
+        # aqui para no cargar una imagen en mitad de la partida.
+        self.fondos = {
+            "transicion": self._poner_fondo("transicion.png"),
+            "final": self._poner_fondo("final.png"),
+        }
         self.titulo = Text(parent=self.raiz, text="", origin=(0, 0),
                            position=(0, .2), scale=2.0, color=CLARO)
         self.cuerpo = Text(parent=self.raiz, text="", origin=(0, 0),
@@ -356,7 +419,10 @@ class PantallaMensaje(Pantalla):
                           position=(0, -.2), color=PANEL)
         self.btn.on_click = al_continuar
 
-    def poner(self, titulo, cuerpo, texto_boton="Continuar"):
+    def poner(self, titulo, cuerpo, texto_boton="Continuar", fondo="transicion"):
         self.titulo.text = titulo
         self.cuerpo.text = cuerpo
         self.btn.text = texto_boton
+        for clave, ent in self.fondos.items():
+            if ent is not None:
+                ent.enabled = (clave == fondo)
