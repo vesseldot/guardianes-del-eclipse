@@ -14,7 +14,7 @@ Si el archivo no existe, se devuelve None y el llamador usa su color liso,
 igual que el resto del juego con los modelos que faltan.
 """
 
-from ursina import Texture, color as ucolor
+from ursina import Texture
 from panda3d.core import (Filename, Texture as PandaTexture, SamplerState,
                           PNMImage)
 

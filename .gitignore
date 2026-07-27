@@ -6,30 +6,14 @@ __pycache__/
 venv/
 .env
 
-# --- Assets pesados excluidos del repo (superan los limites de GitHub) ---
-# Los modelos 3D suman ~2 GB y varios .glb rozan el limite de 100 MB por
-# archivo de GitHub. El juego usa primitivas de respaldo cuando faltan
-# (ver recursos.py y la seccion "Assets" del README).
+# --- Modelos 3D: fuera del repo por tamano ---
+# Suman ~2.6 GB y varios .glb rozan el limite de 100 MB por archivo de GitHub.
+# El juego arranca igual con primitivas de respaldo cuando faltan (ver
+# recursos.crear_visual y la seccion "Assets" del README).
 modelos/**/*.glb
 modelos/**/*.gltf
 modelos/**/*.bin
-
-# Fuentes de Blender (no se usan en tiempo de ejecucion). Ojo: los directorios
-# se llaman "*.blend", por eso se ignoran los archivos por ruta explicita y no
-# con un patron *.blend que borraria las carpetas enteras.
 modelos/**/*.blend
-rock_wall_16_4k.blend/rock_wall_16_4k.blend
-NightSkyHDRI016B_1K/NightSkyHDRI016B_1K.blend
-
-# Set PBR de roca: en runtime solo se usa el diffuse (rock_wall_16_diff_4k.jpg,
-# que SI se sube). El resto del set (displacement, normal, roughness) es pesado
-# y el juego no lo carga.
-rock_wall_16_4k.blend/textures/rock_wall_16_disp_4k.png
-rock_wall_16_4k.blend/textures/rock_wall_16_nor_gl_4k.exr
-rock_wall_16_4k.blend/textures/rock_wall_16_rough_4k.exr
-
-# HDRI del cielo: en runtime solo se usa el JPG tonemapeado (que SI se sube).
-NightSkyHDRI016B_1K/*.exr
 
 # Copias del proyecto descargadas de GitHub (el ZIP de una rama se descomprime
 # como "guardianes-del-eclipse-<rama>"). Traen sus propios modelos y sus rutas NO

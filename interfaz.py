@@ -7,7 +7,7 @@ solo se reescriben cuando su valor cambia, porque asignar .text obliga a
 regenerar la geometria del texto y hacerlo cada frame se nota.
 """
 
-from ursina import (Entity, Text, Button, Quad, camera, color as ucolor,
+from ursina import (Entity, Text, Button, camera, color as ucolor,
                     Vec2, Vec3, destroy)
 from datos import GUARDIANES, OBJETOS
 from config import RAIZ

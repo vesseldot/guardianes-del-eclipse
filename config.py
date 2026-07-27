@@ -12,18 +12,17 @@ from pathlib import Path
 RAIZ = Path(__file__).parent
 MODELOS = RAIZ / "modelos"
 TEXTURAS = RAIZ / "texturas"
-SONIDOS = RAIZ / "sonidos"
 
-# Textura del suelo del arena (color base del set PBR de roca). Si el archivo
+# Textura del suelo del arena (color base de un set PBR de roca). Si el archivo
 # no existe, el suelo usa su color liso de respaldo.
-TEXTURA_PISO = RAIZ / "rock_wall_16_4k.blend" / "textures" / "rock_wall_16_diff_4k.jpg"
+TEXTURA_PISO = TEXTURAS / "piso_roca.jpg"
 PISO_TILES = 6    # cuantas veces se repite la textura a lo largo del arena
 
 # Cielo: HDRI de cielo nocturno, version tonemapeada a JPG (equirectangular).
-# Usamos el JPG y no el .exr HDR porque el pipeline no hace tonemapping propio
+# Se usa el JPG y no un .exr HDR porque el pipeline no hace tonemapping propio
 # y el JPG ya viene con el rango comprimido, listo para mostrarse. Si falta,
 # el fondo liso de la ventana queda como respaldo.
-TEXTURA_CIELO = RAIZ / "NightSkyHDRI016B_1K" / "NightSkyHDRI016B_1K_TONEMAPPED.jpg"
+TEXTURA_CIELO = TEXTURAS / "cielo_nocturno.jpg"
 
 # ---------------------------------------------------------------- ventana
 TITULO = "Guardianes del Eclipse"

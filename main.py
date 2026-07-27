@@ -25,7 +25,7 @@ from config import (Config, MonitorRendimiento, TITULO, VSYNC, MOSTRAR_FPS,
                    TEXTURA_PISO, PISO_TILES, TEXTURA_CIELO, PANTALLA_COMPLETA)
 from entorno import cargar_textura, crear_cielo
 from datos import JEFES, GUARDIANES, TRANSICIONES, MODELOS
-from recursos import faltantes, crear_visual
+from recursos import faltantes
 from proyectiles import PoolProyectiles
 from jugador import Jugador, LIMITE_ARENA, CAM_DIST_MAX
 from fantasma import Fantasma

@@ -37,20 +37,22 @@ el juego sigue funcionando pero los modelos se ven planos.
 
 ## Assets (importante para clonar el repo)
 
-Los **modelos 3D** (`modelos/**/*.glb`, ~2 GB en total) **no están en el
+Los **modelos 3D** (`modelos/**/*.glb`, ~2.6 GB en total) **no están en el
 repositorio**: varios archivos rozan el límite de 100 MB por archivo de GitHub
 y en conjunto exceden el tamaño razonable de un repo. El juego arranca igual
 usando primitivas de respaldo (ver `recursos.py`). Para jugar con los modelos
 reales, colócalos en `modelos/` siguiendo la estructura de más abajo.
 
-**Sí** están incluidas las texturas del entorno que el juego carga en runtime:
+**Sí** están incluidos el resto de assets, que son ligeros:
 
-- `rock_wall_16_4k.blend/textures/rock_wall_16_diff_4k.jpg` — suelo de la arena.
-- `NightSkyHDRI016B_1K/NightSkyHDRI016B_1K_TONEMAPPED.jpg` — cielo nocturno.
+- `texturas/piso_roca.jpg` — suelo de la arena.
+- `texturas/cielo_nocturno.jpg` — cielo nocturno (HDRI tonemapeado).
+- `assets/music/` y `assets/sounds/` — música y efectos.
+- `assets/ui/` — fondos y logo de las pantallas.
 
-Quedan excluidos los `.blend`, el resto del set PBR de roca (displacement,
-normal, roughness) y el HDRI en `.exr`, por peso y porque no se usan en runtime.
-Consulta `.gitignore` para el detalle.
+Del set PBR de roca y del HDRI originales solo se conserva el mapa que el juego
+carga en runtime: el resto (displacement, normal, roughness, `.exr`, `.blend`)
+sumaba ~70 MB que nunca se usaban.
 
 ---
 

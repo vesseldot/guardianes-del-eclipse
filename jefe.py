@@ -10,11 +10,10 @@ y se detiene antes de golpear, dando al jugador la ventana para esquivar.
 """
 
 from ursina import Entity, Vec3, color as ucolor
-from math import radians, sin, cos, atan2, degrees
+from math import atan2, degrees
 from recursos import crear_visual, animar
 from jugador import LIMITE_ARENA
 import sonido
-import random
 
 PERSEGUIR = 0
 TELEGRAFIAR = 1

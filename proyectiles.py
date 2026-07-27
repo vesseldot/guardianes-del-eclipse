@@ -9,7 +9,7 @@ Aqui las entidades se crean UNA vez al inicio y despues solo se activan y
 desactivan. El coste por disparo pasa a ser practicamente cero.
 """
 
-from ursina import Entity, Vec3, color as ucolor, time as utime
+from ursina import Entity, Vec3, color as ucolor
 from config import Config
 
 
