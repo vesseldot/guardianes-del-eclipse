@@ -190,6 +190,47 @@ class HUD(Pantalla):
             self._ult["fase"] = jefe.fase
 
 
+# ---------------------------------------------------------- TITULO
+class PantallaTitulo(Pantalla):
+    """Portada previa al menu: emblema y 'pulsa cualquier tecla'.
+
+    Existe para que el juego no abra directamente en una lista de botones.
+    Cualquier tecla o clic pasa al menu (ver Juego.tecla).
+    """
+
+    # Segundos de un ciclo completo de parpadeo del aviso.
+    CICLO_AVISO = 2.4
+
+    def __init__(self):
+        super().__init__(fondo="menu.png")
+
+        tex_logo = cargar_ui("logo.png", max_lado=1024)
+        if tex_logo is not None:
+            # Mas grande que en el menu: aqui el emblema es el protagonista y
+            # no compite con ningun boton.
+            self.logo = Entity(parent=self.raiz, model="quad", texture=tex_logo,
+                               scale=(.84, .56), position=(0, .12), z=.5)
+        else:
+            Text(parent=self.raiz, text="GUARDIANES DEL ECLIPSE", origin=(0, 0),
+                 position=(0, .12), scale=3.0, color=CLARO)
+
+        self.aviso = Text(parent=self.raiz, text="pulsa cualquier tecla",
+                          origin=(0, 0), position=(0, -.30), scale=1.0, color=CLARO)
+        self._t = 0.0
+
+    def actualizar(self, dt):
+        """Parpadeo suave del aviso. Lo llama el bucle principal.
+
+        Solo se toca el alfa del color, no el texto: reescribir .text obliga a
+        regenerar la geometria y aqui pasaria 60 veces por segundo.
+        """
+        self._t = (self._t + dt) % self.CICLO_AVISO
+        # Onda triangular entre 0 y 1, suavizada hacia los extremos.
+        fase = self._t / self.CICLO_AVISO
+        p = 1.0 - abs(2.0 * fase - 1.0)
+        self.aviso.color = ucolor.rgba32(240, 238, 232, int(90 + 165 * p))
+
+
 # ------------------------------------------------------------ MENU
 class MenuPrincipal(Pantalla):
 

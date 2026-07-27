@@ -41,10 +41,11 @@ FANTASMA_RADIO_APARICION = 3.5
 ALCANCE_MINIMO = (2 * LIMITE_ARENA + CAM_DIST_MAX + 15) / 0.9
 from jefe import Jefe
 from interfaz import (HUD, MenuPrincipal, SeleccionGuardian, Tienda,
-                     PantallaMensaje, Instrucciones)
+                     PantallaMensaje, Instrucciones, PantallaTitulo)
 from vitrina import Vitrina
 
 # --------------------------------------------------------------- estados
+TITULO = "titulo"     # portada previa al menu
 MENU = "menu"
 SELECCION = "seleccion"
 INSTRUCCIONES = "instrucciones"
@@ -61,7 +62,7 @@ class Juego:
         # para ajustar sus parametros (MSAA, normal maps, luces) al cambiar de
         # preset de calidad sin reiniciar el juego.
         self.pbr_pipeline = pbr_pipeline
-        self.estado = MENU
+        self.estado = TITULO
         self.jugador = None
         self.jefe = None
         self.fantasmas = []          # minions vivos, invocados por el conejo
@@ -75,7 +76,7 @@ class Juego:
 
         self.monitor = MonitorRendimiento(al_cambiar=self._calidad_cambio)
         self._aplicar_calidad()
-        self._ir_a(MENU)
+        self._ir_a(TITULO)
 
         # Aviso util durante el desarrollo: que modelos faltan por exportar.
         pendientes = faltantes()
@@ -173,13 +174,14 @@ class Juego:
 
     def _construir_ui(self):
         self.hud = HUD()
+        self.titulo = PantallaTitulo()
         self.menu = MenuPrincipal(self._pulsar_jugar, application.quit, self._ciclar_calidad)
         self.seleccion = SeleccionGuardian(self._elegir_guardian, self._previsualizar_guardian)
         self.instrucciones = Instrucciones(self._comenzar_combate)
         self.tienda = Tienda(self._comprar, self._salir_tienda)
         self.mensaje = PantallaMensaje(self._continuar_mensaje)
-        self.pantallas = (self.hud, self.menu, self.seleccion, self.instrucciones,
-                          self.tienda, self.mensaje)
+        self.pantallas = (self.hud, self.titulo, self.menu, self.seleccion,
+                          self.instrucciones, self.tienda, self.mensaje)
 
         # Escaparate 3D para la seleccion de guardian y la tienda.
         self.vitrina = Vitrina(position=(0, 0, 0))
@@ -250,7 +252,9 @@ class Juego:
         # vuelven a encender abajo.
         self.vitrina.ocultar()
 
-        if estado == MENU:
+        if estado == TITULO:
+            self.titulo.mostrar()
+        elif estado == MENU:
             self.menu.mostrar()
         elif estado == SELECCION:
             self._enfocar_vitrina(hacia_derecha=1.7, distancia=5.6)
@@ -401,6 +405,10 @@ class Juego:
         if self.estado in (SELECCION, TIENDA):
             self.vitrina.rotar(dt)
 
+        # Parpadeo del aviso de la portada.
+        if self.estado == TITULO:
+            self.titulo.actualizar(dt)
+
         if self.estado != COMBATE:
             return
 
@@ -457,6 +465,14 @@ class Juego:
                     p.disable()
 
     def tecla(self, key):
+        if self.estado == TITULO:
+            # Cualquier tecla o clic entra al menu. Se ignoran los eventos de
+            # soltar y la rueda: si no, un 'up' del clic con el que se cerro
+            # otra cosa entraria solo, y la rueda no es una pulsacion.
+            if not key.endswith(" up") and not key.startswith("scroll"):
+                self._ir_a(MENU)
+            return
+
         if self.estado == SELECCION:
             if key in ("up arrow", "left arrow"):
                 self.seleccion.mover(-1)
