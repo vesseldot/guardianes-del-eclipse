@@ -1,15 +1,33 @@
-# Guía de arte para la UI — Guardianes del Eclipse
+# Arte de la interfaz — instrucciones de generación
 
-Especificaciones técnicas y prompts para generar las imágenes de las pantallas
-con Gemini (o cualquier generador de imágenes).
+> **Qué es este documento.** El registro de las **instrucciones (prompts) que se
+> usaron para generar el arte de las pantallas del juego** con IA generativa
+> (Gemini), junto con las especificaciones técnicas que ese arte tenía que
+> cumplir para encajar en el motor.
+>
+> Las imágenes resultantes están en `assets/ui/` y son las que se ven en el
+> juego. Se conserva este documento para dejar constancia del proceso y para
+> poder regenerar o ampliar el arte manteniendo el mismo estilo.
 
 Estilo de referencia: **dark fantasy sobrio** al estilo *Elden Ring* / *Dark
 Souls* — dorado envejecido sobre negro, filigrana heráldica, viñeteado fuerte,
 paleta desaturada, pintura al óleo digital.
 
+**Imágenes generadas y en uso:**
+
+| Archivo | Pantalla |
+|---|---|
+| `logo.png` | Emblema del título |
+| `menu.png` | Portada y menú principal |
+| `instrucciones.png` | Pantalla de controles |
+| `seleccion.png` | Selección de guardián |
+| `tienda.png` | Puesto del mercader |
+| `transicion.png` | Diálogos entre combates |
+| `final.png` | Pantalla de victoria y derrota |
+
 ---
 
-## 1. Especificaciones técnicas (leer antes de generar)
+## 1. Especificaciones técnicas (las que tuvo que cumplir el arte)
 
 El juego usa Ursina. Su capa de interfaz (`camera.ui`) se dibuja **encima** de
 la escena 3D, con estas coordenadas:
@@ -268,15 +286,12 @@ Las imágenes irían en una carpeta nueva `assets/ui/`.
 
 ---
 
-## 6. Pendiente: pantalla de pausa
+## 6. Pantallas sin imagen generada
 
-Ahora mismo **no existe**. En combate, `Esc` llama a `_ir_a(MENU)` y se abandona
-la partida sin preguntar (`main.py`, en `Juego.tecla`). Añadir un botón
-"Continuar" implica crear una pantalla nueva que:
+Dos pantallas del juego **no llevan arte generado**, por decisión de diseño:
 
-- congele la actualización del combate sin destruir su estado,
-- libere el ratón (en combate está bloqueado y centrado),
-- ofrezca *Continuar*, *Calidad* y *Abandonar*.
-
-Es un cambio de código, no solo arte. Su imagen de fondo debería ser un
-oscurecido semitransparente para que se siga viendo el combate detrás.
+- **Pausa.** Solo un velo oscuro semitransparente por código, para que se siga
+  viendo el combate congelado por detrás. Una imagen habría tapado la escena y
+  restado la sensación de que la partida sigue ahí.
+- **Marco del HUD** (§3.7). Se descartó: en combate compite con la información
+  del HUD y estorba más de lo que suma.
