@@ -75,6 +75,83 @@ def ruta_modelo(clave):
     return ruta
 
 
+# Pasos en los que se redondean los pesos de los huesos al simplificar el
+# skinning (ver _combine_mesh_skin_simplificado). Cuantos mas pasos, mas fiel
+# la deformacion pero menos mezclas se funden; 64 es fino y basta para bajar
+# del limite con el fantasma.
+PASOS_PESO = 64
+
+
+def _combine_mesh_skin_simplificado(self, geom_node, charinfo):
+    """Version de gltf.Converter.combine_mesh_skin que cuantiza los pesos.
+
+    El original guarda un indice de mezcla de huesos por vertice en una columna
+    de 16 bits. Como los pesos son flotantes, practicamente cada vertice genera
+    una mezcla distinta, y un modelo denso (el fantasma tiene 158798 vertices)
+    pasa de 65535 y revienta con un AssertionError.
+
+    Redondeando los pesos a PASOS_PESO escalones, miles de vertices comparten la
+    misma mezcla y la tabla baja del limite. La deformacion pierde un pelo de
+    precision, que a este tamano en pantalla no se aprecia, y a cambio el modelo
+    conserva su esqueleto y sus animaciones.
+    """
+    import collections
+    from panda3d.core import (TransformBlendTable, TransformBlend,
+                              GeomVertexWriter, InternalName, SparseArray,
+                              NodePath)
+    jvtmap = charinfo.jvtmap
+    if not jvtmap:
+        return
+    jvtmap = collections.OrderedDict(sorted(jvtmap.items()))
+
+    for geom in geom_node.modify_geoms():
+        gvd = geom.modify_vertex_data()
+        tbtable = TransformBlendTable()
+        tdata = GeomVertexWriter(gvd, InternalName.get_transform_blend())
+        if not tdata.has_column():
+            continue
+
+        jointdata = self.read_vert_data(gvd, InternalName.get_transform_index())
+        weightdata = self.read_vert_data(gvd, InternalName.get_transform_weight())
+
+        for joints, weights in zip(jointdata, weightdata):
+            pesos = [round(float(w) * PASOS_PESO) / PASOS_PESO for w in weights]
+            total = sum(pesos)
+            if total > 0:                      # renormalizar tras redondear
+                pesos = [w / total for w in pesos]
+            tblend = TransformBlend()
+            for joint, peso in zip(joints, pesos):
+                if peso <= 0:                  # los huesos irrelevantes se caen
+                    continue
+                jvt = jvtmap.get(int(joint))
+                if jvt is not None:
+                    tblend.add_transform(jvt, peso)
+            tdata.add_data1i(tbtable.add_blend(tblend))
+
+        tbtable.set_rows(SparseArray.lower_on(gvd.get_num_rows()))
+        gvd.set_transform_blend_table(tbtable)
+        # Igual que el original: deja el skinning en espacio global.
+        inverse = NodePath(geom_node.get_parent(0)).get_net_transform().get_inverse()
+        gvd.transform_vertices(inverse.get_mat())
+
+
+def _cargar_actor_simplificado(ruta_p):
+    """Reintenta cargar como Actor con el skinning cuantizado. None si falla."""
+    try:
+        import gltf._converter as conv
+    except Exception:
+        return None
+    original = conv.Converter.combine_mesh_skin
+    conv.Converter.combine_mesh_skin = _combine_mesh_skin_simplificado
+    try:
+        return Actor(ruta_p)
+    except Exception as e:
+        print(f"[recursos] tampoco cargo con skinning simplificado: {e}")
+        return None
+    finally:
+        conv.Converter.combine_mesh_skin = original
+
+
 def _cargar_sin_esqueleto(ruta_p):
     """Carga un .glb descartando su skinning. Devuelve el nodo, o None.
 
@@ -137,10 +214,20 @@ def crear_visual(padre, clave, escala_extra=1.0):
             actor.setScale(escala)
             _asentar_en_suelo(actor, padre)
             return actor, actor
-        except Exception as e:
+        except Exception:
+            # Segundo intento: mismo Actor pero con el skinning cuantizado.
+            # Recupera modelos demasiado densos para la tabla de mezclas SIN
+            # perder el esqueleto, asi que conservan sus animaciones.
+            actor = _cargar_actor_simplificado(ruta_p)
+            if actor is not None:
+                reducir_texturas(actor, Config.p("tex_modelo_max"))
+                actor.reparent_to(padre)
+                actor.setScale(escala)
+                _asentar_en_suelo(actor, padre)
+                return actor, actor
             # Un modelo mal exportado no debe tumbar la partida.
             _sin_actor.add(ruta_p)
-            print(f"[recursos] {clave}: no carga como Actor, se usara estatico ({e})")
+            print(f"[recursos] {clave}: no carga como Actor, se usara estatico")
 
     if ruta:
         # Modelo sin animacion: mas barato que un Actor.

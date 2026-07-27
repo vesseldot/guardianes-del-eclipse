@@ -37,6 +37,9 @@ FANTASMAS_OLEADA = 4          # cuantos acompanan al jefe final
 # A 0.6 salen cuando el jefe ya ha levantado los brazos, que es cuando el gesto
 # "suelta": si aparecieran en el frame 0 pareceria que no tienen que ver con el.
 FANTASMAS_MOMENTO = 0.6
+# Cuantas oleadas llega a invocar el jefe final en total. Al despejar una,
+# vuelve a conjurar la siguiente hasta agotarlas.
+FANTASMAS_OLEADAS = 3
 
 # El plano de recorte lejano no debe cortar nunca al jefe ni esconderlo tras la
 # cupula del cielo (cuyo radio es 0.9*lejano). Peor caso: jugador y jefe en
@@ -74,6 +77,7 @@ class Juego:
         self.jefe = None
         self.fantasmas = []          # minions vivos, invocados por el conejo
         self._t_invocacion = 0.0     # cuenta atras hasta que salen (>0 = pendiente)
+        self._oleadas_lanzadas = 0   # oleadas ya invocadas en el combate final
         self.indice_jefe = 0
         self.fragmentos = 0
         self.comprados = set()
@@ -362,9 +366,9 @@ class Juego:
 
         # Oleada de fantasmas en el combate final: el jefe hace su conjuro y
         # los fantasmas aparecen a media animacion. Salen una sola vez.
+        self._oleadas_lanzadas = 0
         if definicion["patron"] == "final":
-            self.jefe.invocar()
-            self._t_invocacion = self.jefe.temporizador * FANTASMAS_MOMENTO
+            self._empezar_oleada()
 
         self._ir_a(COMBATE)
 
@@ -437,6 +441,21 @@ class Juego:
             self.fantasmas.append(f)
         sonido.reproducir_sfx("enemy_attack")
 
+    def _empezar_oleada(self):
+        """Lanza el conjuro del jefe; los fantasmas saldran a media animacion."""
+        self.jefe.invocar()
+        self._t_invocacion = self.jefe.temporizador * FANTASMAS_MOMENTO
+        self._oleadas_lanzadas += 1
+
+    def _quedan_oleadas(self):
+        """True si el jefe final todavia tiene otra oleada que invocar y no hay
+        ninguna en curso ni pendiente de salir."""
+        return (self.jefe is not None and self.jefe.vivo
+                and self.jefe.patron == "final"
+                and self._oleadas_lanzadas < FANTASMAS_OLEADAS
+                and self._t_invocacion <= 0
+                and not self.fantasmas)
+
     def _limpiar_fantasmas(self):
         # Cancela tambien una oleada pendiente: si no, al abandonar el combate
         # los fantasmas apareceriamos en la siguiente partida.
@@ -478,6 +497,10 @@ class Juego:
             else:
                 destroy(f)
         self.fantasmas = vivos
+
+        # Oleada despejada: el jefe vuelve a conjurar, hasta agotar las suyas.
+        if self._quedan_oleadas():
+            self._empezar_oleada()
 
         self._mover_proyectiles(dt)
         self.hud.actualizar(self.jugador, self.jefe, self.fragmentos)
