@@ -22,7 +22,7 @@ from math import sin, cos, radians
 import random
 
 from config import (Config, MonitorRendimiento, TITULO, VSYNC, MOSTRAR_FPS,
-                   TEXTURA_PISO, PISO_TILES, TEXTURA_CIELO)
+                   TEXTURA_PISO, PISO_TILES, TEXTURA_CIELO, PANTALLA_COMPLETA)
 from entorno import cargar_textura, crear_cielo
 from datos import JEFES, GUARDIANES, TRANSICIONES, MODELOS
 from recursos import faltantes, crear_visual
@@ -572,6 +572,7 @@ if __name__ == "__main__":
         title=TITULO,
         borderless=False,
         vsync=VSYNC,
+        fullscreen=PANTALLA_COMPLETA,
         development_mode=False,   # desactiva recargas en caliente: mas rapido
     )
     window.fps_counter.enabled = MOSTRAR_FPS

@@ -20,6 +20,24 @@ RESALTE = ucolor.rgba32(150, 120, 40, 230)   # boton actualmente elegido
 
 DIR_UI = RAIZ / "assets" / "ui"
 
+# Relacion de aspecto con la que se genero el arte de la interfaz.
+ASPECTO_ARTE = 16 / 9
+
+
+def escala_cubriendo(aspecto_imagen=ASPECTO_ARTE):
+    """Escala del quad para cubrir la pantalla SIN deformar la imagen.
+
+    El espacio de UI mide 1 de alto y 'aspect_ratio' de ancho. Si la pantalla
+    no es 16:9 (portatiles 16:10, por ejemplo), escalar a (aspect_ratio, 1)
+    estiraria el arte. Aqui se ajusta al lado que se quede corto y se deja que
+    sobre por el otro, que es lo que hace un fondo de 'cover': se recorta un
+    poco antes que deformarse.
+    """
+    a = camera.aspect_ratio
+    if a >= aspecto_imagen:
+        return (a, a / aspecto_imagen)   # ajusta al ancho; sobra por arriba y abajo
+    return (aspecto_imagen, 1)           # ajusta al alto; sobra por los lados
+
 # Cache de texturas de interfaz: varias pantallas pueden pedir la misma imagen
 # y cargarla dos veces seria pagar dos veces la memoria.
 _cache_ui = {}
@@ -50,19 +68,23 @@ class Pantalla:
         self.raiz = Entity(parent=camera.ui, enabled=False)
         self.fondo = self._poner_fondo(fondo) if fondo else None
 
-    def _poner_fondo(self, archivo):
+    def _poner_fondo(self, archivo, tinte=None):
         """Imagen a pantalla completa detras del resto de la pantalla.
 
         z=1 la manda al fondo: en camera.ui lo que tiene mas z se dibuja
-        detras, asi que textos y botones (z=0) quedan por delante. La escala
-        es (aspect_ratio, 1) porque el espacio de UI mide 1 de alto y
-        'aspect_ratio' de ancho: eso cubre la pantalla justa.
+        detras, asi que textos y botones (z=0) quedan por delante.
+
+        'tinte' multiplica el color de la imagen: sirve para oscurecer un
+        fondo demasiado luminoso y que el texto encima se lea.
         """
         tex = cargar_ui(archivo)
         if tex is None:
             return None
-        return Entity(parent=self.raiz, model="quad", texture=tex,
-                      scale=(camera.aspect_ratio, 1), z=1)
+        e = Entity(parent=self.raiz, model="quad", texture=tex,
+                   scale=escala_cubriendo(), z=1)
+        if tinte is not None:
+            e.color = tinte
+        return e
 
     def mostrar(self):
         self.raiz.enabled = True
@@ -488,14 +510,25 @@ class PantallaMensaje(Pantalla):
         # Esta pantalla se reutiliza para dos momentos muy distintos, asi que
         # tiene dos fondos y enciende uno u otro en poner(). Se crean los dos
         # aqui para no cargar una imagen en mitad de la partida.
+        # El fondo final es el mas luminoso de todos (el mecanismo dorado con
+        # los rayos de luz) y el texto encima no se leia. Se le baja el brillo
+        # a la mitad con un tinte; al de transicion, que ya es oscuro, apenas
+        # se le toca.
         self.fondos = {
-            "transicion": self._poner_fondo("transicion.png"),
-            "final": self._poner_fondo("final.png"),
+            "transicion": self._poner_fondo("transicion.png",
+                                            tinte=ucolor.rgb32(190, 190, 190)),
+            "final": self._poner_fondo("final.png",
+                                       tinte=ucolor.rgb32(105, 105, 110)),
         }
+        # Nota: se probo una banda oscura tras el texto para reforzar el
+        # contraste, pero un quad liso deja dos bordes horizontales visibles
+        # cruzando la imagen. Con el tinte de arriba el texto ya se lee, asi
+        # que se prefiere no ensuciar el arte.
         self.titulo = Text(parent=self.raiz, text="", origin=(0, 0),
                            position=(0, .2), scale=2.0, color=CLARO)
+        # Antes iba en TENUE (gris) y sobre el fondo claro se perdia.
         self.cuerpo = Text(parent=self.raiz, text="", origin=(0, 0),
-                           position=(0, .04), scale=1.0, color=TENUE)
+                           position=(0, .04), scale=1.05, color=CLARO)
         self.btn = Button(parent=self.raiz, text="Continuar", scale=(.3, .075),
                           position=(0, -.2), color=PANEL)
         self.btn.on_click = al_continuar

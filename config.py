@@ -29,6 +29,10 @@ TEXTURA_CIELO = RAIZ / "NightSkyHDRI016B_1K" / "NightSkyHDRI016B_1K_TONEMAPPED.j
 TITULO = "Guardianes del Eclipse"
 VSYNC = True              # limita a la tasa del monitor y evita quemar GPU
 MOSTRAR_FPS = False       # activar solo al depurar: el contador cuesta unos ms
+# Pantalla completa a la resolucion nativa del monitor. Se aplica al crear la
+# ventana, ANTES de construir la interfaz: los fondos se escalan una sola vez
+# con la relacion de aspecto final. Ponerlo en False deja ventana.
+PANTALLA_COMPLETA = True
 
 # ---------------------------------------------------------------- presets
 # Cada preset controla lo caro: sombras dinamicas, particulas, niebla,
